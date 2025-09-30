@@ -17,22 +17,15 @@ lint.extend-ignore = [
     "RUF",
     "S",
     "A",
-    #  More specific
-    "COM812", # Missing trailing comma
-    "CPY001", # Missing copyright header
-    "E501", # Line too long
-    "S101", # Use of assert detected
-    "ISC001",
-    # Later
-    "TD002",
-    "TD003",
-    "ARG002",
-    "PT011",
-    "PT012",
-    "SLF001",
-    "T201",
-    # TODO
+    # False positives
+    "COM812", #  	[*] missing-trailing-comma
+    #  Fix
+    "T201", #    	[*] print
+    "CPY001", #  	[ ] missing-copyright-notice
     "PLC0415", # 	[ ] import-outside-top-level
+    "SLF001", #  	[ ] private-member-access
+    "E501", #    	[ ] line-too-long
+    "PT011", #   	[ ] pytest-raises-too-broad
     "C901", #    	[ ] complex-structure
     "BLE001", #  	[ ] blind-except
     "INP001", #  	[ ] implicit-namespace-package
@@ -41,7 +34,7 @@ lint.extend-ignore = [
     "G004", #    	[ ] logging-f-string
     "G201", #    	[ ] logging-exc-info
     "N802", #    	[ ] invalid-function-name
+    "PT012", #   	[ ] pytest-raises-with-multiple-statements
     "RET504", #  	[*] unnecessary-assign
-    "PLC2801", # 	[ ] unnecessary-dunder-call
+#    "PLC2801", # 	[ ] unnecessary-dunder-call
 ]
-

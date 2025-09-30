@@ -63,7 +63,8 @@ class Client:
     async def __aenter__(self) -> Self:
         """Async context manager entry."""
         self._transport = create_transport(self.config.url, timeout=self.config.timeout)
-        await self._transport.__aenter__()
+        # Manually manage transport lifecycle - we're composing context managers
+        await self._transport.__aenter__()  # noqa: PLC2801
         return self
 
     async def __aexit__(self, *args: object) -> None:
@@ -99,10 +100,11 @@ class Client:
         """
         if not self._transport:
             # Auto-create transport if not using context manager
+            # We manually manage the lifecycle here to support concurrent calls
             self._transport = create_transport(
                 self.config.url, timeout=self.config.timeout
             )
-            await self._transport.__aenter__()
+            await self._transport.__aenter__()  # noqa: PLC2801
 
         # For HTTP batch transport, each request is a micro-session
         # Import IDs start from 1 for each batch
