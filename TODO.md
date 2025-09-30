@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**v0.3.0 - Resume Tokens Complete** ✅
+**v0.2.1 - Resume Tokens Complete** ✅
 
 - ✅ Core protocol types (IDs, errors, wire format)
 - ✅ HTTP batch transport (client & server)
