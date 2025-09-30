@@ -97,7 +97,46 @@ class ResumeToken:
 
 
 class ResumeTokenManager:
-    """Manages resume tokens and session state."""
+    """Manages resume tokens and session state.
+
+    IMPORTANT: This implementation stores session state in-memory, which does NOT
+    scale beyond a single server process. For production deployments with multiple
+    server instances (e.g., behind a load balancer), you MUST:
+
+    1. Subclass this manager and override `create_token()`, `restore_session()`,
+       `invalidate_token()`, and `cleanup_expired()` to use a distributed store
+       (Redis, Memcached, database, etc.)
+
+    2. OR use a sticky session strategy at the load balancer level (not recommended
+       for high availability)
+
+    Example distributed implementation:
+    ```python
+    class RedisResumeTokenManager(ResumeTokenManager):
+        def __init__(self, redis_client, default_ttl=3600.0):
+            super().__init__(default_ttl)
+            self.redis = redis_client
+
+        def create_token(self, imports, exports, ttl=None, metadata=None):
+            token = super().create_token(imports, exports, ttl, metadata)
+            # Store in Redis with automatic expiration
+            self.redis.setex(
+                f"session:{token.session_id}",
+                int(token.expires_at - token.created_at),
+                json.dumps({"imports": imports, "exports": exports})
+            )
+            return token
+
+        def restore_session(self, token):
+            if not token.is_valid():
+                return None
+            data = self.redis.get(f"session:{token.session_id}")
+            if data:
+                session = json.loads(data)
+                return (session["imports"], session["exports"], True)
+            return ({}, {}, False)
+    ```
+    """
 
     def __init__(self, default_ttl: float = 3600.0) -> None:
         """Initialize resume token manager.

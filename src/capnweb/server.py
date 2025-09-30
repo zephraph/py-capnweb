@@ -46,6 +46,31 @@ class Server:
 
     Supports HTTP batch transport with the protocol endpoints:
     - POST /rpc/batch: HTTP batch RPC
+
+    Session State and Transport Considerations:
+    -------------------------------------------
+    This server manages session state (Import/Export tables) that persists between
+    requests when using resume tokens. This creates important architectural considerations:
+
+    1. **HTTP Batch (Stateless Transport)**:
+       - Each HTTP request is independent
+       - Server holds session state in memory between requests
+       - Memory usage grows with number of active sessions
+       - Resume tokens enable "sessionful" model over stateless HTTP
+       - Best for: Short-lived sessions, single-server deployments
+
+    2. **WebSocket (Stateful Transport)**:
+       - Long-lived connection with natural session lifecycle
+       - Session state lifetime tied to connection
+       - More resource-efficient (session ends when connection closes)
+       - No need for resume tokens within same connection
+       - Best for: Long-running sessions, real-time communication
+
+    For production deployments:
+    - Consider memory implications of holding sessions for HTTP clients
+    - Use WebSocket for long-lived, stateful interactions
+    - Use distributed session store (Redis) for multi-server HTTP deployments
+    - Set appropriate `resume_token_ttl` to balance UX and resource usage
     """
 
     def __init__(self, config: ServerConfig) -> None:

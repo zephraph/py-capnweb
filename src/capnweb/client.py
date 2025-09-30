@@ -10,6 +10,7 @@ from typing_extensions import Self
 from capnweb.error import ErrorCode, RpcError
 from capnweb.evaluator import ExpressionEvaluator
 from capnweb.ids import ExportId, IdAllocator, ImportId
+from capnweb.pipeline import PendingCall, PipelineBatch, PipelinePromise
 from capnweb.resume import ResumeToken  # noqa: TC001
 from capnweb.tables import ExportTable, ImportTable
 from capnweb.transports import HttpBatchTransport, WebSocketTransport, create_transport
@@ -298,3 +299,57 @@ class Client:
             "capability_count": len(token.capabilities),
             "metadata": token.metadata,
         }
+
+    def pipeline(self) -> PipelineBatch:
+        """Create a pipeline batch for batching multiple RPC calls.
+
+        Returns:
+            A PipelineBatch that can be used to make multiple calls
+            that will be sent in a single HTTP batch
+
+        Example:
+            ```python
+            batch = client.pipeline()
+            user = batch.call(0, "authenticate", ["token-123"])
+            profile = batch.call(0, "getUserProfile", [user.id])
+            notifications = batch.call(0, "getNotifications", [user.id])
+
+            # All three calls sent in one HTTP request
+            u, p, n = await asyncio.gather(user, profile, notifications)
+            ```
+        """
+        return PipelineBatch(self)
+
+    def call_pipelined(
+        self,
+        batch: PipelineBatch,
+        cap_id: int,
+        method: str,
+        args: list[Any],
+        property_path: list[str] | None = None,
+    ) -> PipelinePromise:
+        """Make a pipelined RPC call as part of a batch.
+
+        Args:
+            batch: The pipeline batch this call belongs to
+            cap_id: The capability ID (use 0 for main capability)
+            method: The method name
+            args: List of arguments (can include PipelinePromise objects)
+            property_path: Optional property path to navigate before calling method
+
+        Returns:
+            A PipelinePromise that can be awaited or used in other pipelined calls
+
+        Note:
+            This method is typically called through PipelineBatch.call() rather than directly.
+        """
+        import_id = batch._allocate_import_id()
+        pending_call = PendingCall(
+            import_id=import_id,
+            cap_id=cap_id,
+            method=method,
+            args=args,
+            property_path=property_path,
+        )
+        batch._add_call(pending_call)
+        return PipelinePromise(self, batch, import_id)

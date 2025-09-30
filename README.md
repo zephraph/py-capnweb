@@ -5,12 +5,15 @@ Python implementation of the [Cap'n Web protocol](https://github.com/cloudflare/
 ## Features
 
 - **Capability-based security**: Unforgeable object references with explicit disposal
+- **Promise pipelining**: Batch multiple dependent RPC calls into single round trips
 - **Expression evaluation**: Full support for wire expressions including remap (`.map()` operations)
 - **Multiple transports**: HTTP batch and WebSocket with pluggable transport abstraction
 - **Type-safe**: Full type hints with pyright/mypy compatibility
 - **Async/await**: Built on Python's asyncio
 - **Error handling**: Structured error model with security-conscious stack trace redaction
 - **Reference counting**: Automatic resource management with proper refcounting
+- **Resume tokens**: Session restoration for stateful connections
+- **Bidirectional RPC**: Peer-to-peer capability passing
 - **Interoperable**: Compatible with TypeScript and Rust implementations
 
 ## Installation
@@ -88,6 +91,37 @@ async def main() -> None:
 
         result = await client.call(0, "subtract", [10, 4])
         print(f"10 - 4 = {result}")  # Output: 10 - 4 = 6
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Promise Pipelining
+
+Batch multiple dependent calls into a single round trip:
+
+```python
+import asyncio
+from capnweb.client import Client, ClientConfig
+
+async def main() -> None:
+    config = ClientConfig(url="http://localhost:8080/rpc/batch")
+
+    async with Client(config) as client:
+        # Create a pipeline batch
+        batch = client.pipeline()
+
+        # Make dependent calls - they will be batched
+        user = batch.call(0, "authenticate", ["token-123"])
+        profile = batch.call(0, "getUserProfile", [user.id])  # Property access on promise!
+        notifications = batch.call(0, "getNotifications", [user.id])
+
+        # All three calls execute efficiently
+        u, p, n = await asyncio.gather(user, profile, notifications)
+
+        print(f"User: {u['name']}")
+        print(f"Profile: {p['bio']}")
+        print(f"Notifications: {len(n)} unread")
 
 if __name__ == "__main__":
     asyncio.run(main())
