@@ -1,0 +1,63 @@
+preview = true
+
+lint.select = [
+    "ALL",
+]
+
+lint.extend-ignore = [
+    # Later...
+    "ANN", # flake8-annotations
+    "D", # pydocstyle
+    "EM", # flake8-errmsg
+    "PTH", # flake8-use-pathlib
+    "DOC",
+    "TRY",
+    "PLR",
+    "ARG",
+    "FBT",
+    "ERA",
+    "RUF",
+    "S",
+    "A",
+    #  More specific
+    "COM812", # Missing trailing comma
+    "CPY001", # Missing copyright header
+    "E501", # Line too long
+    "I001", # Import block is un-sorted or un-formatted
+    "S101", # Use of assert detected
+    "TD002",
+    "TD003",
+    "ARG002",
+    "FBT002",
+    "FBT003",
+    "PLC1901",
+    "PLR2004",
+    "PLR6301",
+    "PLW0603",
+    "PLW1514",
+    "PT011",
+    "S104",
+    "S108",
+    "S404",
+    "S603",
+    "SIM117",
+    "SLF001",
+    "T201",
+    # TODO
+    "PLC0415", # 	[ ] import-outside-top-level
+#    "TC001", #   	[*] typing-only-first-party-import
+    "C901", #    	[ ] complex-structure
+    "BLE001", #  	[ ] blind-except
+    "INP001", #  	[ ] implicit-namespace-package
+    "PYI034", #  	[*] non-self-return-type
+    "ASYNC110", #	[ ] async-busy-wait
+    "EXE001", #  	[ ] shebang-not-executable
+    "G004", #    	[ ] logging-f-string
+    "G201", #    	[ ] logging-exc-info
+    "PIE810", #  	[*] multiple-starts-ends-with
+    "TC003", #   	[*] typing-only-standard-library-import
+    "N802", #    	[ ] invalid-function-name
+    "RET504", #  	[*] unnecessary-assign
+    "PLC2801", # 	[ ] unnecessary-dunder-call
+]
+
