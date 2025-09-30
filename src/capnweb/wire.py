@@ -28,7 +28,8 @@ class PropertyKey:
             return PropertyKey(value)
         if isinstance(value, int):
             return PropertyKey(value)
-        raise ValueError(f"Invalid property key: {value}")
+        msg = f"Invalid property key: {value}"
+        raise ValueError(msg)
 
 
 # Wire Expressions
@@ -64,7 +65,8 @@ class WireError:
     def from_json(arr: list[Any]) -> WireError:
         """Parse from JSON array."""
         if len(arr) < 3:
-            raise ValueError("Error expression requires at least 3 elements")
+            msg = "Error expression requires at least 3 elements"
+            raise ValueError(msg)
         error_type = arr[1]
         message = arr[2]
         stack = arr[3] if len(arr) > 3 else None
@@ -86,7 +88,8 @@ class WireImport:
     def from_json(arr: list[Any]) -> WireImport:
         """Parse from JSON array."""
         if len(arr) != 2:
-            raise ValueError("Import expression requires exactly 2 elements")
+            msg = "Import expression requires exactly 2 elements"
+            raise ValueError(msg)
         return WireImport(arr[1])
 
 
@@ -105,7 +108,8 @@ class WireExport:
     def from_json(arr: list[Any]) -> WireExport:
         """Parse from JSON array."""
         if len(arr) != 2:
-            raise ValueError("Export expression requires exactly 2 elements")
+            msg = "Export expression requires exactly 2 elements"
+            raise ValueError(msg)
         return WireExport(arr[1])
 
 
@@ -123,7 +127,8 @@ class WirePromise:
     def from_json(arr: list[Any]) -> WirePromise:
         """Parse from JSON array."""
         if len(arr) != 2:
-            raise ValueError("Promise expression requires exactly 2 elements")
+            msg = "Promise expression requires exactly 2 elements"
+            raise ValueError(msg)
         return WirePromise(arr[1])
 
 
@@ -150,7 +155,8 @@ class WirePipeline:
     def from_json(arr: list[Any]) -> WirePipeline:
         """Parse from JSON array."""
         if len(arr) < 2:
-            raise ValueError("Pipeline expression requires at least 2 elements")
+            msg = "Pipeline expression requires at least 2 elements"
+            raise ValueError(msg)
         import_id = arr[1]
         property_path = (
             [PropertyKey.from_json(k) for k in arr[2]]
@@ -175,7 +181,8 @@ class WireDate:
     def from_json(arr: list[Any]) -> WireDate:
         """Parse from JSON array."""
         if len(arr) != 2:
-            raise ValueError("Date expression requires exactly 2 elements")
+            msg = "Date expression requires exactly 2 elements"
+            raise ValueError(msg)
         return WireDate(arr[1])
 
 
@@ -194,7 +201,8 @@ class WireCapture:
     def from_json(arr: list[Any]) -> WireCapture:
         """Parse from JSON array."""
         if len(arr) != 2 or arr[0] not in ("import", "export"):
-            raise ValueError("Capture requires ['import'|'export', id]")
+            msg = "Capture requires ['import'|'export', id]"
+            raise ValueError(msg)
         return WireCapture(arr[0], arr[1])
 
 
@@ -222,7 +230,8 @@ class WireRemap:
     def from_json(arr: list[Any]) -> WireRemap:
         """Parse from JSON array."""
         if len(arr) != 5:
-            raise ValueError("Remap expression requires exactly 5 elements")
+            msg = "Remap expression requires exactly 5 elements"
+            raise ValueError(msg)
         import_id = arr[1]
         property_path = (
             [PropertyKey.from_json(pk) for pk in arr[2]] if arr[2] is not None else None
@@ -300,7 +309,8 @@ def wire_expression_from_json(value: Any) -> WireExpression:
             # Regular array
             return [wire_expression_from_json(item) for item in value]
 
-    raise ValueError(f"Invalid wire expression: {value}")
+    msg = f"Invalid wire expression: {value}"
+    raise ValueError(msg)
 
 
 def wire_expression_to_json(expr: WireExpression) -> Any:
@@ -333,7 +343,8 @@ def wire_expression_to_json(expr: WireExpression) -> Any:
             return expr.to_json()
 
         case _:
-            raise ValueError(f"Invalid wire expression: {expr}")
+            msg = f"Invalid wire expression: {expr}"
+            raise ValueError(msg)
 
 
 # Wire Messages
@@ -415,45 +426,54 @@ def parse_wire_message(data: str) -> WireMessage:
     """Parse a wire message from JSON string."""
     arr = json.loads(data)
     if not isinstance(arr, list) or not arr:
-        raise ValueError("Wire message must be a non-empty array")
+        msg = "Wire message must be a non-empty array"
+        raise ValueError(msg)
 
     msg_type = arr[0]
     if not isinstance(msg_type, str):
-        raise ValueError("Message type must be a string")
+        msg = "Message type must be a string"
+        raise ValueError(msg)
 
     match msg_type:
         case "push":
             if len(arr) != 2:
-                raise ValueError("Push message requires exactly 2 elements")
+                msg = "Push message requires exactly 2 elements"
+                raise ValueError(msg)
             return WirePush(wire_expression_from_json(arr[1]))
 
         case "pull":
             if len(arr) != 2:
-                raise ValueError("Pull message requires exactly 2 elements")
+                msg = "Pull message requires exactly 2 elements"
+                raise ValueError(msg)
             return WirePull(arr[1])
 
         case "resolve":
             if len(arr) != 3:
-                raise ValueError("Resolve message requires exactly 3 elements")
+                msg = "Resolve message requires exactly 3 elements"
+                raise ValueError(msg)
             return WireResolve(arr[1], wire_expression_from_json(arr[2]))
 
         case "reject":
             if len(arr) != 3:
-                raise ValueError("Reject message requires exactly 3 elements")
+                msg = "Reject message requires exactly 3 elements"
+                raise ValueError(msg)
             return WireReject(arr[1], wire_expression_from_json(arr[2]))
 
         case "release":
             if len(arr) != 3:
-                raise ValueError("Release message requires exactly 3 elements")
+                msg = "Release message requires exactly 3 elements"
+                raise ValueError(msg)
             return WireRelease(arr[1], arr[2])
 
         case "abort":
             if len(arr) != 2:
-                raise ValueError("Abort message requires exactly 2 elements")
+                msg = "Abort message requires exactly 2 elements"
+                raise ValueError(msg)
             return WireAbort(wire_expression_from_json(arr[1]))
 
         case _:
-            raise ValueError(f"Unknown message type: {msg_type}")
+            msg = f"Unknown message type: {msg_type}"
+            raise ValueError(msg)
 
 
 def serialize_wire_message(msg: WireMessage) -> str:

@@ -336,10 +336,12 @@ class TestResumeIntegration:
                     return self.count
                 if method == "get":
                     return self.count
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
             async def get_property(self, property: str) -> Any:  # noqa: ARG002
-                raise RpcError.not_found("Property access not implemented")
+                msg = "Property access not implemented"
+                raise RpcError.not_found(msg)
 
         # Create server with capability
         config = ServerConfig()
@@ -385,10 +387,12 @@ class TestResumeIntegration:
             async def call(self, method: str, args: list[Any]) -> Any:
                 if method == "getName":
                     return self.name
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
             async def get_property(self, property: str) -> Any:  # noqa: ARG002
-                raise RpcError.not_found("Property access not implemented")
+                msg = "Property access not implemented"
+                raise RpcError.not_found(msg)
 
         # Create server with multiple capabilities
         config = ServerConfig()

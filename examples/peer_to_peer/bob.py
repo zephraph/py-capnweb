@@ -42,13 +42,15 @@ class Bob(RpcTarget):
                 }
 
             case _:
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
     async def get_property(self, property: str) -> Any:
         """Get property value."""
         if property == "name":
             return self.name
-        raise RpcError.not_found(f"Property {property} not found")
+        msg = f"Property {property} not found"
+        raise RpcError.not_found(msg)
 
 
 async def main() -> None:

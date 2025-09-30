@@ -28,19 +28,22 @@ class Alice(RpcTarget):
             case "ask_bob":
                 # Alice calls Bob (demonstrates peer-to-peer)
                 if not self.bob_client:
-                    raise RpcError.internal("Bob not connected")
+                    msg = "Bob not connected"
+                    raise RpcError.internal(msg)
                 question = args[0] if args else "How are you?"
                 bob_answer = await self.bob_client.call(0, "answer", [question])
                 return f"Bob says: {bob_answer}"
 
             case _:
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
     async def get_property(self, property: str) -> Any:
         """Get property."""
         if property == "name":
             return self.name
-        raise RpcError.not_found(f"Property {property} not found")
+        msg = f"Property {property} not found"
+        raise RpcError.not_found(msg)
 
 
 class Bob(RpcTarget):
@@ -64,18 +67,21 @@ class Bob(RpcTarget):
             case "greet_alice":
                 # Bob calls Alice (demonstrates peer-to-peer)
                 if not self.alice_client:
-                    raise RpcError.internal("Alice not connected")
+                    msg = "Alice not connected"
+                    raise RpcError.internal(msg)
                 alice_greeting = await self.alice_client.call(0, "greet", [])
                 return f"Alice says: {alice_greeting}"
 
             case _:
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
     async def get_property(self, property: str) -> Any:
         """Get property."""
         if property == "name":
             return self.name
-        raise RpcError.not_found(f"Property {property} not found")
+        msg = f"Property {property} not found"
+        raise RpcError.not_found(msg)
 
 
 @pytest.mark.asyncio
@@ -208,12 +214,14 @@ class TestMultiplePeers:
                     case "get_messages":
                         return self.messages_received
                     case _:
-                        raise RpcError.not_found(f"Method {method} not found")
+                        msg = f"Method {method} not found"
+                        raise RpcError.not_found(msg)
 
             async def get_property(self, property: str) -> Any:
                 if property == "name":
                     return self.name
-                raise RpcError.not_found(f"Property {property} not found")
+                msg = f"Property {property} not found"
+                raise RpcError.not_found(msg)
 
         # Create three peer servers
         peer1 = Peer("Peer1")

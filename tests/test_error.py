@@ -80,7 +80,8 @@ class TestRpcError:
     def test_exception_behavior(self) -> None:
         """Test that RpcError can be raised as an exception."""
         with pytest.raises(RpcError) as exc_info:
-            raise RpcError.not_found("Test error")
+            msg = "Test error"
+            raise RpcError.not_found(msg)
 
         error = exc_info.value
         assert error.code == ErrorCode.NOT_FOUND

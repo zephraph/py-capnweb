@@ -50,7 +50,8 @@ class ImportTable:
         """Get the value for an import ID."""
         entry = self._entries.get(import_id)
         if entry is None:
-            raise RpcError.not_found(f"Import {import_id} not found")
+            msg = f"Import {import_id} not found"
+            raise RpcError.not_found(msg)
         return entry.value
 
     def release(self, import_id: ImportId, ref_count: int = 1) -> bool:
@@ -115,7 +116,8 @@ class ExportTable:
         """Get the target for an export ID."""
         entry = self._entries.get(export_id)
         if entry is None:
-            raise RpcError.not_found(f"Export {export_id} not found")
+            msg = f"Export {export_id} not found"
+            raise RpcError.not_found(msg)
         return entry.target
 
     def release(self, export_id: ExportId, ref_count: int = 1) -> bool:

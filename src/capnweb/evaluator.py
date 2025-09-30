@@ -126,9 +126,8 @@ class ExpressionEvaluator:
                 target = self._exports.get(export_id)
 
                 if not isinstance(target, asyncio.Future):
-                    raise RpcError.internal(
-                        f"Promise export {export_id} is not a Future"
-                    )
+                    msg = f"Promise export {export_id} is not a Future"
+                    raise RpcError.internal(msg)
 
                 if resolve_promises:
                     return await target
@@ -154,9 +153,8 @@ class ExpressionEvaluator:
                     if self._imports.contains(import_id):
                         target = self._imports.get(import_id)
                     else:
-                        raise RpcError.not_found(
-                            f"Capability/import {expr.import_id} not found"
-                        )
+                        msg = f"Capability/import {expr.import_id} not found"
+                        raise RpcError.not_found(msg)
 
                 # If target is a promise, wait for it to resolve
                 if isinstance(target, asyncio.Future):
@@ -174,9 +172,8 @@ class ExpressionEvaluator:
                         elif hasattr(target, str(prop_name)):
                             target = getattr(target, str(prop_name))
                         else:
-                            raise RpcError.not_found(
-                                f"Property {prop_name} not found on {type(target)}"
-                            )
+                            msg = f"Property {prop_name} not found on {type(target)}"
+                            raise RpcError.not_found(msg)
                     return target
 
                 # If args are provided, make a method call
@@ -198,9 +195,10 @@ class ExpressionEvaluator:
                             elif hasattr(target, str(prop_name)):
                                 target = getattr(target, str(prop_name))
                             else:
-                                raise RpcError.not_found(
+                                msg = (
                                     f"Property {prop_name} not found on {type(target)}"
                                 )
+                                raise RpcError.not_found(msg)
 
                         # Call the method (last element in property path)
                         method = str(expr.property_path[-1].value)
@@ -210,12 +208,10 @@ class ExpressionEvaluator:
                             return result
                         if callable(target):
                             return target(*args)
-                        raise RpcError.bad_request(
-                            f"Cannot call {method} on {type(target)}, not callable"
-                        )
-                    raise RpcError.bad_request(
-                        "Pipeline call requires a method name in property path"
-                    )
+                        msg = f"Cannot call {method} on {type(target)}, not callable"
+                        raise RpcError.bad_request(msg)
+                    msg = "Pipeline call requires a method name in property path"
+                    raise RpcError.bad_request(msg)
 
                 return target
 
@@ -225,7 +221,8 @@ class ExpressionEvaluator:
 
             case _:
                 # Unknown expression type
-                raise RpcError.bad_request(f"Unknown expression type: {type(expr)}")
+                msg = f"Unknown expression type: {type(expr)}"
+                raise RpcError.bad_request(msg)
 
     async def call_capability(
         self, export_id: ExportId, method: str, args: list[Any]
@@ -246,9 +243,8 @@ class ExpressionEvaluator:
         target = self._exports.get(export_id)
 
         if not isinstance(target, RpcTarget):
-            raise RpcError.internal(
-                f"Export {export_id} is not a capability, got {type(target)}"
-            )
+            msg = f"Export {export_id} is not a capability, got {type(target)}"
+            raise RpcError.internal(msg)
 
         return await target.call(method, args)
 
@@ -268,9 +264,8 @@ class ExpressionEvaluator:
         target = self._exports.get(export_id)
 
         if not isinstance(target, RpcTarget):
-            raise RpcError.internal(
-                f"Export {export_id} is not a capability, got {type(target)}"
-            )
+            msg = f"Export {export_id} is not a capability, got {type(target)}"
+            raise RpcError.internal(msg)
 
         return await target.get_property(property)
 
@@ -313,9 +308,8 @@ class ExpressionEvaluator:
                 elif hasattr(target_value, str(prop_name)):
                     target_value = getattr(target_value, str(prop_name))
                 else:
-                    raise RpcError.not_found(
-                        f"Property {prop_name} not found on {type(target_value)}"
-                    )
+                    msg = f"Property {prop_name} not found on {type(target_value)}"
+                    raise RpcError.not_found(msg)
 
         # Resolve captures - convert WireCapture to actual values
         captured_values = []
@@ -333,7 +327,8 @@ class ExpressionEvaluator:
                     value = await value
                 captured_values.append(value)
             else:
-                raise RpcError.bad_request(f"Invalid capture type: {capture.type}")
+                msg = f"Invalid capture type: {capture.type}"
+                raise RpcError.bad_request(msg)
 
         # Create a mapper function that executes the instructions
         async def mapper(input_value: Any) -> Any:
@@ -441,9 +436,8 @@ class RemapExpressionEvaluator:
                 # Negative ID - refers to captures
                 capture_index = (-import_id) - 1
                 if capture_index >= len(self._captures):
-                    raise RpcError.bad_request(
-                        f"Capture index {capture_index} out of bounds (have {len(self._captures)} captures)"
-                    )
+                    msg = f"Capture index {capture_index} out of bounds (have {len(self._captures)} captures)"
+                    raise RpcError.bad_request(msg)
                 return self._captures[capture_index]
 
             if import_id == 0:
@@ -453,9 +447,8 @@ class RemapExpressionEvaluator:
             # Positive ID - refers to previous instruction results
             result_index = import_id - 1
             if result_index >= len(results):
-                raise RpcError.bad_request(
-                    f"Result index {result_index} out of bounds (have {len(results)} results)"
-                )
+                msg = f"Result index {result_index} out of bounds (have {len(results)} results)"
+                raise RpcError.bad_request(msg)
             return results[result_index]
 
         # Handle WireExport - use base export table
@@ -492,14 +485,16 @@ class RemapExpressionEvaluator:
             if import_id < 0:
                 capture_index = (-import_id) - 1
                 if capture_index >= len(self._captures):
-                    raise RpcError.bad_request("Capture index out of bounds")
+                    msg = "Capture index out of bounds"
+                    raise RpcError.bad_request(msg)
                 target = self._captures[capture_index]
             elif import_id == 0:
                 target = self._input_value
             else:
                 result_index = import_id - 1
                 if result_index >= len(results):
-                    raise RpcError.bad_request("Result index out of bounds")
+                    msg = "Result index out of bounds"
+                    raise RpcError.bad_request(msg)
                 target = results[result_index]
 
             # If target is a promise/future, resolve it
@@ -518,7 +513,8 @@ class RemapExpressionEvaluator:
                     elif hasattr(target, str(prop_name)):
                         target = getattr(target, str(prop_name))
                     else:
-                        raise RpcError.not_found(f"Property {prop_name} not found")
+                        msg = f"Property {prop_name} not found"
+                        raise RpcError.not_found(msg)
                 return target
 
             # Method call
@@ -538,17 +534,21 @@ class RemapExpressionEvaluator:
                         elif hasattr(target, str(prop_name)):
                             target = getattr(target, str(prop_name))
                         else:
-                            raise RpcError.not_found(f"Property {prop_name} not found")
+                            msg = f"Property {prop_name} not found"
+                            raise RpcError.not_found(msg)
 
                     method = str(expr.property_path[-1].value)
                     if isinstance(target, RpcTarget):
                         return await target.call(method, args)
                     if callable(target):
                         return target(*args)
-                    raise RpcError.bad_request(f"Cannot call {method}")
-                raise RpcError.bad_request("Pipeline call requires method name")
+                    msg = f"Cannot call {method}"
+                    raise RpcError.bad_request(msg)
+                msg = "Pipeline call requires method name"
+                raise RpcError.bad_request(msg)
 
             return target
 
         # Unknown expression type
-        raise RpcError.bad_request(f"Unknown expression type in remap: {type(expr)}")
+        msg = f"Unknown expression type in remap: {type(expr)}"
+        raise RpcError.bad_request(msg)

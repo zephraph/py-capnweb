@@ -107,7 +107,8 @@ class TestStackTraceRedaction:
 
         class BrokenCapability(RpcTarget):
             async def call(self, method: str, args: list) -> None:
-                raise ValueError("Intentional error for testing")
+                msg = "Intentional error for testing"
+                raise ValueError(msg)
 
             async def get_property(self, property: str) -> None:
                 pass
@@ -132,7 +133,8 @@ class TestStackTraceRedaction:
 
         class BrokenCapability(RpcTarget):
             async def call(self, method: str, args: list) -> None:
-                raise ValueError("Test error")
+                msg = "Test error"
+                raise ValueError(msg)
 
             async def get_property(self, property: str) -> None:
                 pass

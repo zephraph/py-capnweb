@@ -16,28 +16,34 @@ class Calculator(RpcTarget):
         match method:
             case "add":
                 if len(args) != 2:
-                    raise RpcError.bad_request("add requires 2 arguments")
+                    msg = "add requires 2 arguments"
+                    raise RpcError.bad_request(msg)
                 return args[0] + args[1]
 
             case "subtract":
                 if len(args) != 2:
-                    raise RpcError.bad_request("subtract requires 2 arguments")
+                    msg = "subtract requires 2 arguments"
+                    raise RpcError.bad_request(msg)
                 return args[0] - args[1]
 
             case "multiply":
                 if len(args) != 2:
-                    raise RpcError.bad_request("multiply requires 2 arguments")
+                    msg = "multiply requires 2 arguments"
+                    raise RpcError.bad_request(msg)
                 return args[0] * args[1]
 
             case "divide":
                 if len(args) != 2:
-                    raise RpcError.bad_request("divide requires 2 arguments")
+                    msg = "divide requires 2 arguments"
+                    raise RpcError.bad_request(msg)
                 if args[1] == 0:
-                    raise RpcError.bad_request("Cannot divide by zero")
+                    msg = "Cannot divide by zero"
+                    raise RpcError.bad_request(msg)
                 return args[0] / args[1]
 
             case _:
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
     async def get_property(self, property: str) -> Any:
         """Get a property."""
@@ -47,7 +53,8 @@ class Calculator(RpcTarget):
             case "name":
                 return "Calculator"
             case _:
-                raise RpcError.not_found(f"Property {property} not found")
+                msg = f"Property {property} not found"
+                raise RpcError.not_found(msg)
 
 
 class Counter(RpcTarget):
@@ -76,18 +83,21 @@ class Counter(RpcTarget):
 
             case "add":
                 if len(args) != 1:
-                    raise RpcError.bad_request("add requires 1 argument")
+                    msg = "add requires 1 argument"
+                    raise RpcError.bad_request(msg)
                 self._count += args[0]
                 return self._count
 
             case _:
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
     async def get_property(self, property: str) -> Any:
         """Get a property."""
         if property == "count":
             return self._count
-        raise RpcError.not_found(f"Property {property} not found")
+        msg = f"Property {property} not found"
+        raise RpcError.not_found(msg)
 
 
 @pytest.fixture

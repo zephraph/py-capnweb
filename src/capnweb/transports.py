@@ -50,7 +50,8 @@ class HttpBatchTransport:
             aiohttp.ClientError: If request fails
         """
         if not self._session:
-            raise RuntimeError("Transport not open - use async context manager")
+            msg = "Transport not open - use async context manager"
+            raise RuntimeError(msg)
 
         # For HTTP batch, we don't actually send immediately
         # Instead, we store the data to be sent with receive()
@@ -68,10 +69,12 @@ class HttpBatchTransport:
             aiohttp.ClientError: If request fails
         """
         if not self._session:
-            raise RuntimeError("Transport not open")
+            msg = "Transport not open"
+            raise RuntimeError(msg)
 
         if not hasattr(self, "_pending_data"):
-            raise RuntimeError("No data to send - call send() first")
+            msg = "No data to send - call send() first"
+            raise RuntimeError(msg)
 
         data = self._pending_data
         delattr(self, "_pending_data")
@@ -140,7 +143,8 @@ class WebSocketTransport:
             RuntimeError: If transport is not connected
         """
         if not self._ws:
-            raise RuntimeError("WebSocket not connected")
+            msg = "WebSocket not connected"
+            raise RuntimeError(msg)
 
         await self._ws.send_bytes(data)
 
@@ -155,7 +159,8 @@ class WebSocketTransport:
             ConnectionError: If WebSocket is closed
         """
         if not self._ws:
-            raise RuntimeError("WebSocket not connected")
+            msg = "WebSocket not connected"
+            raise RuntimeError(msg)
 
         msg = await self._ws.receive()
 
@@ -164,10 +169,13 @@ class WebSocketTransport:
         if msg.type == aiohttp.WSMsgType.TEXT:
             return msg.data.encode("utf-8")
         if msg.type == aiohttp.WSMsgType.CLOSE:
-            raise ConnectionError("WebSocket closed")
+            msg = "WebSocket closed"
+            raise ConnectionError(msg)
         if msg.type == aiohttp.WSMsgType.ERROR:
-            raise ConnectionError(f"WebSocket error: {self._ws.exception()}")
-        raise ValueError(f"Unexpected message type: {msg.type}")
+            msg = f"WebSocket error: {self._ws.exception()}"
+            raise ConnectionError(msg)
+        msg = f"Unexpected message type: {msg.type}"
+        raise ValueError(msg)
 
     async def send_and_receive(self, data: bytes) -> bytes:
         """Send data and receive response (convenience method).
@@ -212,4 +220,5 @@ def create_transport(
     if url.startswith(("http://", "https://")):
         timeout = kwargs.get("timeout", 30.0)
         return HttpBatchTransport(url, timeout=timeout)
-    raise ValueError(f"Unsupported URL scheme: {url}")
+    msg = f"Unsupported URL scheme: {url}"
+    raise ValueError(msg)

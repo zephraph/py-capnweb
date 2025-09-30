@@ -40,7 +40,8 @@ class Api(RpcTarget):
 
         user = USERS.get(session_token)
         if not user:
-            raise ValueError("Invalid session")
+            msg = "Invalid session"
+            raise ValueError(msg)
         return user  # {"id": ..., "name": ...}
 
     async def getUserProfile(self, user_id: str) -> dict[str, str]:
@@ -50,7 +51,8 @@ class Api(RpcTarget):
 
         profile = PROFILES.get(user_id)
         if not profile:
-            raise ValueError("No such user")
+            msg = "No such user"
+            raise ValueError(msg)
         return profile  # {"id": ..., "bio": ...}
 
     async def getNotifications(self, user_id: str) -> list[str]:
@@ -70,11 +72,13 @@ class Api(RpcTarget):
             case "getNotifications":
                 return await self.getNotifications(args[0] if args else "")
             case _:
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
     async def get_property(self, property: str) -> Any:
         """Get property value."""
-        raise RpcError.not_found(f"Property {property} not found")
+        msg = f"Property {property} not found"
+        raise RpcError.not_found(msg)
 
 
 async def main() -> None:

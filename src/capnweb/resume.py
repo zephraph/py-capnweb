@@ -72,7 +72,8 @@ class ResumeToken:
                 metadata=data.get("metadata"),
             )
         except (KeyError, json.JSONDecodeError, ValueError) as e:
-            raise ValueError(f"Invalid resume token format: {e}") from e
+            msg = f"Invalid resume token format: {e}"
+            raise ValueError(msg) from e
 
     def is_expired(self) -> bool:
         """Check if the token has expired.

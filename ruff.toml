@@ -8,8 +8,6 @@ lint.extend-ignore = [
     # Later...
     "ANN", # flake8-annotations
     "D", # pydocstyle
-    "EM", # flake8-errmsg
-    "PTH", # flake8-use-pathlib
     "DOC",
     "TRY",
     "PLR",
@@ -25,11 +23,12 @@ lint.extend-ignore = [
     "E501", # Line too long
     "S101", # Use of assert detected
     "ISC001",
-    # Laters
+    # Later
     "TD002",
     "TD003",
     "ARG002",
     "PT011",
+    "PT012",
     "SLF001",
     "T201",
     # TODO
@@ -37,7 +36,6 @@ lint.extend-ignore = [
     "C901", #    	[ ] complex-structure
     "BLE001", #  	[ ] blind-except
     "INP001", #  	[ ] implicit-namespace-package
-#    "PYI034", #  	[*] non-self-return-type
     "ASYNC110", #	[ ] async-busy-wait
     "EXE001", #  	[ ] shebang-not-executable
     "G004", #    	[ ] logging-f-string

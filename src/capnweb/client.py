@@ -159,7 +159,8 @@ class Client:
         except RpcError:
             raise
         except Exception as e:
-            raise RpcError.internal(f"Transport error: {e}") from e
+            msg = f"Transport error: {e}"
+            raise RpcError.internal(msg) from e
         finally:
             # Clean up
             self._pending_promises.pop(import_id, None)

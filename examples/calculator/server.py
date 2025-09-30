@@ -14,10 +14,12 @@ class Calculator(RpcTarget):
             case "subtract":
                 return args[0] - args[1]
             case _:
-                raise RpcError.not_found(f"Method {method} not found")
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
     async def get_property(self, property: str) -> Any:  # noqa: ARG002
-        raise RpcError.not_found("Property access not implemented")
+        msg = "Property access not implemented"
+        raise RpcError.not_found(msg)
 
 
 async def main() -> None:
