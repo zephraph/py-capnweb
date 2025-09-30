@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**v0.2.0 - Core Protocol Complete** ✅
+**v0.3.0 - Resume Tokens Complete** ✅
 
 - ✅ Core protocol types (IDs, errors, wire format)
 - ✅ HTTP batch transport (client & server)
@@ -17,33 +17,14 @@
 - ✅ Error handling with custom data fields
 - ✅ Security: Stack trace redaction
 - ✅ Bidirectional RPC (peer-to-peer)
-- ✅ 134 tests, 72% coverage
+- ✅ Resume tokens for session restoration
+- ✅ 153 tests, 74% coverage
 
 ---
 
 ## High Priority
 
-### 1. Resume Tokens
-
-Allows sessions to be resumed after reconnection, preserving capability references.
-
-**Implementation:**
-- [ ] Design token format (JSON with session ID, capability map, timestamp)
-- [ ] Add `resume_token()` method to Server
-- [ ] Add resume token validation in Client
-- [ ] Store capability mappings in persistent storage
-- [ ] Add expiration logic for tokens
-- [ ] Tests for resume scenarios
-
-**Files:**
-- `src/capnweb/resume.py` (new)
-- `src/capnweb/server.py` (modify)
-- `src/capnweb/client.py` (modify)
-- `tests/test_resume.py` (new)
-
----
-
-### 2. Promise Pipelining (Optimization)
+### 1. Promise Pipelining (Optimization)
 
 Chain calls without waiting for intermediate results.
 
@@ -69,7 +50,7 @@ profile = await client.call(user.id, "getProfile", [])
 
 ---
 
-### 3. Interoperability Tests
+### 2. Interoperability Tests
 
 Test Python client/server against TypeScript reference implementation.
 
@@ -89,7 +70,7 @@ Test Python client/server against TypeScript reference implementation.
 
 ## Medium Priority
 
-### 4. WebTransport / HTTP/3
+### 3. WebTransport / HTTP/3
 
 Modern transport using HTTP/3 and QUIC.
 
@@ -118,7 +99,7 @@ Modern transport using HTTP/3 and QUIC.
 
 ---
 
-### 5. IL (Intermediate Language) Execution
+### 4. IL (Intermediate Language) Execution
 
 Execute complex multi-step operations defined in IL on the server.
 
@@ -137,7 +118,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 6. Connection Management Improvements
+### 5. Connection Management Improvements
 
 **What's missing:**
 - Connection pooling
@@ -160,7 +141,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 7. Performance Optimization
+### 6. Performance Optimization
 
 **Areas to optimize:**
 1. **JSON serialization** - Use faster libraries (orjson)
@@ -186,7 +167,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ## Low Priority / Nice to Have
 
-### 8. Logging & Observability
+### 7. Logging & Observability
 
 **What's missing:**
 - Structured logging
@@ -209,7 +190,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 9. Additional Examples
+### 8. Additional Examples
 
 **Needed examples:**
 - [x] Simple calculator
@@ -228,7 +209,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 10. API Documentation
+### 9. API Documentation
 
 **Needed:**
 - Sphinx documentation site
@@ -254,7 +235,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 11. Property-Based Testing
+### 10. Property-Based Testing
 
 Generate random inputs to find edge cases using Hypothesis.
 
@@ -270,7 +251,7 @@ Generate random inputs to find edge cases using Hypothesis.
 
 ---
 
-### 12. Load Testing
+### 11. Load Testing
 
 Test behavior under high load.
 
@@ -305,16 +286,16 @@ These can be done quickly for immediate value:
 | HTTP Batch | ✅ | ✅ | Done |
 | WebSocket | ✅ | ✅ | Done |
 | WebTransport | ✅ | ❌ | TODO |
-| Resume Tokens | ✅ | ❌ | High Priority |
+| Resume Tokens | ✅ | ✅ | Done |
 | Bidirectional | ✅ | ✅ | Done |
 | Promise Pipeline | ✅ | ⚠️ Basic | Medium Priority |
 | Remap (`.map()`) | ✅ | ✅ | Done |
 | IL Execution | ✅ | ⚠️ Remap only | Low Priority |
 | Release + Refcount | ✅ | ✅ | Done |
 | Escaped Arrays | ✅ | ✅ | Done |
-| Test Coverage | ~90% | 72% | Ongoing |
+| Test Coverage | ~90% | 74% | Ongoing |
 
-**Overall Compliance: ~85%**
+**Overall Compliance: ~90%**
 
 ---
 

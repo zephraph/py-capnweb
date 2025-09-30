@@ -2,11 +2,11 @@
 
 import pytest
 
+from capnweb.client import Client, ClientConfig
 from capnweb.error import RpcError
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 from capnweb.wire import WireError
-from capnweb.client import Client, ClientConfig
 
 
 class TestWireErrorEnhancements:

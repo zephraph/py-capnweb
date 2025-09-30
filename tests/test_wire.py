@@ -1,5 +1,7 @@
 """Tests for wire protocol implementation."""
 
+import math
+
 import pytest
 
 from capnweb.wire import (
@@ -21,7 +23,6 @@ from capnweb.wire import (
     serialize_wire_batch,
     wire_expression_to_json,
 )
-import math
 
 
 class TestPropertyKey:

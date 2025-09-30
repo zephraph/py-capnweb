@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from capnweb.error import RpcError
 
 if TYPE_CHECKING:
-    from capnweb.types import RpcTarget
     from capnweb.ids import ExportId, ImportId
+    from capnweb.types import RpcTarget
 
 
 @dataclass
@@ -73,6 +73,30 @@ class ImportTable:
         """Clear all entries."""
         self._entries.clear()
 
+    def snapshot(self) -> dict[int, tuple[Any, int]]:
+        """Create a snapshot of the import table state.
+
+        Returns:
+            Dictionary mapping import_id -> (value, ref_count)
+        """
+        return {
+            entry.import_id.value: (entry.value, entry.ref_count)
+            for entry in self._entries.values()
+        }
+
+    def restore(self, snapshot: dict[int, tuple[Any, int]]) -> None:
+        """Restore import table from a snapshot.
+
+        Args:
+            snapshot: Dictionary mapping import_id -> (value, ref_count)
+        """
+        from capnweb.ids import ImportId
+
+        self._entries.clear()
+        for import_id_val, (value, ref_count) in snapshot.items():
+            import_id = ImportId(import_id_val)
+            self._entries[import_id] = ImportEntry(import_id, value, ref_count)
+
 
 class ExportTable:
     """Export table for managing exported capabilities and promises."""
@@ -113,3 +137,33 @@ class ExportTable:
     def clear(self) -> None:
         """Clear all entries."""
         self._entries.clear()
+
+    def snapshot(self) -> dict[int, tuple[Any, int]]:
+        """Create a snapshot of the export table state.
+
+        Returns:
+            Dictionary mapping export_id -> (target, ref_count)
+
+        Note:
+            Futures/promises are not serialized and will be lost on restoration.
+            This is acceptable for HTTP batch (stateless) but may need enhancement
+            for WebSocket sessions.
+        """
+        return {
+            entry.export_id.value: (entry.target, entry.ref_count)
+            for entry in self._entries.values()
+            if not isinstance(entry.target, asyncio.Future)  # Skip promises
+        }
+
+    def restore(self, snapshot: dict[int, tuple[Any, int]]) -> None:
+        """Restore export table from a snapshot.
+
+        Args:
+            snapshot: Dictionary mapping export_id -> (target, ref_count)
+        """
+        from capnweb.ids import ExportId
+
+        self._entries.clear()
+        for export_id_val, (target, ref_count) in snapshot.items():
+            export_id = ExportId(export_id_val)
+            self._entries[export_id] = ExportEntry(export_id, target, ref_count)

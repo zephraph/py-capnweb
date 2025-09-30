@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from typing_extensions import Self
 
 from capnweb.error import ErrorCode, RpcError
 from capnweb.evaluator import ExpressionEvaluator
 from capnweb.ids import ExportId, IdAllocator, ImportId
+from capnweb.resume import ResumeToken  # noqa: TC001
 from capnweb.tables import ExportTable, ImportTable
 from capnweb.transports import HttpBatchTransport, WebSocketTransport, create_transport
 from capnweb.wire import (
@@ -27,6 +29,8 @@ from capnweb.wire import (
 )
 
 if TYPE_CHECKING:
+    import asyncio
+
     from capnweb.types import RpcTarget
 
 
@@ -56,7 +60,7 @@ class Client:
         self._pending_promises: dict[ImportId, asyncio.Future[Any]] = {}
         self._import_ref_counts: dict[ImportId, int] = {}
 
-    async def __aenter__(self) -> Client:
+    async def __aenter__(self) -> Self:
         """Async context manager entry."""
         self._transport = create_transport(self.config.url, timeout=self.config.timeout)
         await self._transport.__aenter__()
@@ -257,3 +261,37 @@ class Client:
             target: The RPC target implementation
         """
         self._exports.add(ExportId(export_id), target)
+
+    def validate_resume_token(self, token: ResumeToken) -> bool:
+        """Validate a resume token.
+
+        Args:
+            token: Token to validate
+
+        Returns:
+            True if token is valid (not expired, properly formed), False otherwise
+
+        Note:
+            This only validates the token structure and expiration.
+            Server-side validation is required to ensure the session still exists.
+        """
+        return token.is_valid()
+
+    def get_resume_token_info(self, token: ResumeToken) -> dict[str, Any]:
+        """Get information about a resume token without restoring it.
+
+        Args:
+            token: Token to inspect
+
+        Returns:
+            Dictionary with token information (session_id, expires_at, etc.)
+        """
+        return {
+            "session_id": token.session_id,
+            "created_at": token.created_at,
+            "expires_at": token.expires_at,
+            "is_expired": token.is_expired(),
+            "is_valid": token.is_valid(),
+            "capability_count": len(token.capabilities),
+            "metadata": token.metadata,
+        }

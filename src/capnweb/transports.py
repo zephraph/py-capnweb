@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 import aiohttp
+from typing_extensions import Self
 
 
 class HttpBatchTransport:
@@ -29,7 +30,7 @@ class HttpBatchTransport:
         self.timeout = timeout
         self._session: aiohttp.ClientSession | None = None
 
-    async def __aenter__(self) -> HttpBatchTransport:
+    async def __aenter__(self) -> Self:
         """Async context manager entry."""
         self._session = aiohttp.ClientSession()
         return self
@@ -119,7 +120,7 @@ class WebSocketTransport:
         self._session: aiohttp.ClientSession | None = None
         self._ws: aiohttp.ClientWebSocketResponse | None = None
 
-    async def __aenter__(self) -> WebSocketTransport:
+    async def __aenter__(self) -> Self:
         """Async context manager entry."""
         self._session = aiohttp.ClientSession()
         self._ws = await self._session.ws_connect(self.url)
@@ -206,9 +207,9 @@ def create_transport(
         >>> transport = create_transport("http://localhost:8080/rpc/batch")
         >>> transport = create_transport("ws://localhost:8080/rpc/ws")
     """
-    if url.startswith("ws://") or url.startswith("wss://"):
+    if url.startswith(("ws://", "wss://")):
         return WebSocketTransport(url)
-    if url.startswith("http://") or url.startswith("https://"):
+    if url.startswith(("http://", "https://")):
         timeout = kwargs.get("timeout", 30.0)
         return HttpBatchTransport(url, timeout=timeout)
     raise ValueError(f"Unsupported URL scheme: {url}")

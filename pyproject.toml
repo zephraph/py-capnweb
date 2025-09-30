@@ -1,6 +1,6 @@
 [project]
 name = "py-capnweb"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python implementation of the Cap'n Web protocol"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,6 +21,14 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
+
+[project.urls]
+Homepage = "https://github.com/abilian/py-capnweb"
+Documentation = "https://github.com/abilian/py-capnweb#readme"
+Repository = "https://github.com/abilian/py-capnweb.git"
+Issues = "https://github.com/abilian/py-capnweb/issues"
+Changelog = "https://github.com/abilian/py-capnweb/releases"
+"Cap'n Web Protocol" = "https://github.com/cloudflare/capnweb"
 
 dependencies = [
     "aiohttp>=3.9.0",

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from capnweb.error import RpcError
 from capnweb.ids import ExportId, ImportId

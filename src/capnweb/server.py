@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
 from capnweb.error import RpcError
 from capnweb.evaluator import ExpressionEvaluator
 from capnweb.ids import ExportId, IdAllocator, ImportId
+from capnweb.resume import ResumeToken, ResumeTokenManager
 from capnweb.tables import ExportTable, ImportTable
 from capnweb.wire import (
     WireAbort,
@@ -37,6 +38,7 @@ class ServerConfig:
     port: int = 8080
     max_batch_size: int = 100
     include_stack_traces: bool = False  # Security: disabled by default
+    resume_token_ttl: float = 3600.0  # Resume token TTL in seconds (1 hour)
 
 
 class Server:
@@ -57,6 +59,9 @@ class Server:
         self._app: web.Application | None = None
         self._runner: web.AppRunner | None = None
         self._pending_pulls: dict[ImportId, list[asyncio.Future[WireMessage]]] = {}
+        self._resume_manager = ResumeTokenManager(
+            default_ttl=self.config.resume_token_ttl
+        )
 
     def register_capability(self, export_id: int, target: RpcTarget) -> None:
         """Register a capability with the given export ID.
@@ -253,6 +258,66 @@ class Server:
             stack = traceback.format_exc() if self.config.include_stack_traces else None
             error_expr = WireError("internal", "Internal server error", stack)
             return WireReject(export_id.value, error_expr)
+
+    def create_resume_token(
+        self, metadata: dict[str, Any] | None = None
+    ) -> ResumeToken:
+        """Create a resume token for the current session.
+
+        Args:
+            metadata: Optional custom metadata to include in the token
+
+        Returns:
+            ResumeToken that can be used to restore this session
+        """
+        # Snapshot current table state
+        imports_dict = self._imports.snapshot()
+        exports_dict = self._exports.snapshot()
+
+        return self._resume_manager.create_token(
+            imports=imports_dict, exports=exports_dict, metadata=metadata
+        )
+
+    def restore_from_token(self, token: ResumeToken) -> bool:
+        """Restore session state from a resume token.
+
+        Args:
+            token: Token to restore from
+
+        Returns:
+            True if restoration was successful and session was found, False otherwise
+        """
+        result = self._resume_manager.restore_session(token)
+        if result is None:
+            return False
+
+        imports_dict, exports_dict, session_found = result
+
+        # If session was not found, this is a failed restoration
+        if not session_found:
+            return False
+
+        # Restore table state (even if empty - empty session is valid)
+        self._imports.restore(imports_dict)
+        self._exports.restore(exports_dict)
+
+        return True
+
+    def invalidate_resume_token(self, session_id: str) -> None:
+        """Invalidate a resume token.
+
+        Args:
+            session_id: Session ID to invalidate
+        """
+        self._resume_manager.invalidate_token(session_id)
+
+    def cleanup_expired_tokens(self) -> int:
+        """Clean up expired resume tokens.
+
+        Returns:
+            Number of tokens cleaned up
+        """
+        return self._resume_manager.cleanup_expired()
 
     async def _handle_release(
         self, import_id: ImportId, refcount: int
