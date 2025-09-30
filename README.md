@@ -99,25 +99,19 @@ if __name__ == "__main__":
 
 ```bash
 # Clone and install with uv
-git clone https://github.com/yourusername/capn-python.git
-cd capn-python
+git clone https://github.com/abilian/py-capnweb.git
+cd py-capnweb
 uv sync
-
-# Or with pip
-pip install -e ".[dev]"
 ```
 
 ### Testing
 
 ```bash
-# Run all tests
+make test
+# or
 pytest
-
-# Run with coverage
-pytest --cov=src/capnweb --cov-report=term-missing
-
-# Run specific test file
 pytest tests/test_wire.py -v
+# etc.
 ```
 
 ### Linting & Type Checking
@@ -195,10 +189,6 @@ This implementation follows the official [Cap'n Web protocol specification](http
 Designed to be fully compatible with:
 - [TypeScript reference implementation](https://github.com/cloudflare/capnweb)
 - Rust implementation (in development)
-
-## Contributing
-
-Contributions are welcome! Please see [CLAUDE.md](./CLAUDE.md) for development guidelines.
 
 ## License
 
