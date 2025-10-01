@@ -8,11 +8,12 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import Self
 
 from capnweb.error import ErrorCode, RpcError
-from capnweb.evaluator import ExpressionEvaluator
-from capnweb.ids import ExportId, IdAllocator, ImportId
+from capnweb.hooks import PayloadStubHook
+from capnweb.ids import ExportId
+from capnweb.payload import RpcPayload
 from capnweb.pipeline import PendingCall, PipelineBatch, PipelinePromise
 from capnweb.resume import ResumeToken  # noqa: TC001
-from capnweb.tables import ExportTable, ImportTable
+from capnweb.session import RpcSession
 from capnweb.transports import HttpBatchTransport, WebSocketTransport, create_transport
 from capnweb.wire import (
     PropertyKey,
@@ -30,8 +31,6 @@ from capnweb.wire import (
 )
 
 if TYPE_CHECKING:
-    import asyncio
-
     from capnweb.types import RpcTarget
 
 
@@ -43,23 +42,18 @@ class ClientConfig:
     timeout: float = 30.0
 
 
-class Client:
+class Client(RpcSession):
     """Cap'n Web client implementation.
 
     Supports multiple transports via the Transport abstraction.
+    Extends RpcSession to get unified import/export table management.
     """
 
     def __init__(self, config: ClientConfig) -> None:
+        super().__init__()
         self.config = config
-        self._id_allocator = IdAllocator()
-        self._imports = ImportTable()
-        self._exports = ExportTable()
-        self._evaluator = ExpressionEvaluator(
-            self._imports, self._exports, is_server=False
-        )
         self._transport: HttpBatchTransport | WebSocketTransport | None = None
-        self._pending_promises: dict[ImportId, asyncio.Future[Any]] = {}
-        self._import_ref_counts: dict[ImportId, int] = {}
+        self._import_ref_counts: dict[int, int] = {}
 
     async def __aenter__(self) -> Self:
         """Async context manager entry."""
@@ -109,11 +103,15 @@ class Client:
 
         # For HTTP batch transport, each request is a micro-session
         # Import IDs start from 1 for each batch
-        import_id = ImportId(1)
+        import_id = 1
 
         # Build property path including method name
         full_path = (property_path or []) + [method]
         path_keys = [PropertyKey(p) for p in full_path]
+
+        # Serialize arguments using the new serializer
+        args_payload = RpcPayload.from_app_params(args)
+        serialized_args = self.serializer.serialize_payload(args_payload)
 
         # Create pipeline expression that references the capability and calls the method
         # For cap_id=0 (main), we use ImportId(0)
@@ -121,12 +119,12 @@ class Client:
         pipeline_expr = WirePipeline(
             import_id=cap_id,
             property_path=path_keys,
-            args=args,
+            args=serialized_args,
         )
 
         # Create push and pull messages
         push_msg = WirePush(pipeline_expr)
-        pull_msg = WirePull(import_id.value)
+        pull_msg = WirePull(import_id)
 
         # Send the batch
         batch = serialize_wire_batch([push_msg, pull_msg])
@@ -149,9 +147,11 @@ class Client:
             result = None
             error = None
             for msg in messages:
-                if isinstance(msg, WireResolve) and msg.export_id == -import_id.value:
-                    result = msg.value
-                elif isinstance(msg, WireReject) and msg.export_id == -import_id.value:
+                if isinstance(msg, WireResolve) and msg.export_id == -import_id:
+                    # Parse the result using the new parser
+                    result_payload = self.parser.parse(msg.value)
+                    result = result_payload.value
+                elif isinstance(msg, WireReject) and msg.export_id == -import_id:
                     error = self._parse_error(msg.error)
 
             if error:
@@ -164,9 +164,6 @@ class Client:
         except Exception as e:
             msg = f"Transport error: {e}"
             raise RpcError.internal(msg) from e
-        finally:
-            # Clean up
-            self._pending_promises.pop(import_id, None)
 
     async def _process_message(self, msg: WireMessage) -> None:
         """Process a response message from the server."""
@@ -187,13 +184,14 @@ class Client:
     async def _handle_resolve(self, export_id: ExportId, value: Any) -> None:
         """Handle a resolve message from the server."""
         # Convert export ID to import ID (they're negatives of each other)
-        import_id = export_id.to_import_id()
+        import_id = -export_id.value
 
-        # Get the pending promise
-        future = self._pending_promises.get(import_id)
-        if future and not future.done():
-            # Resolve the promise with the value
-            future.set_result(value)
+        # Parse the value using the parser
+        result_payload = self.parser.parse(value)
+
+        # Create a PayloadStubHook and resolve the promise
+        hook = PayloadStubHook(result_payload)
+        self.resolve_promise(import_id, hook)
 
     def _parse_error(self, error_expr: Any) -> RpcError:
         """Parse an error expression into an RpcError."""
@@ -208,16 +206,13 @@ class Client:
     async def _handle_reject(self, export_id: ExportId, error_expr: Any) -> None:
         """Handle a reject message from the server."""
         # Convert export ID to import ID
-        import_id = export_id.to_import_id()
+        import_id = -export_id.value
 
         # Parse error
         error = self._parse_error(error_expr)
 
-        # Get the pending promise
-        future = self._pending_promises.get(import_id)
-        if future and not future.done():
-            # Reject the promise with the error
-            future.set_exception(error)
+        # Reject the promise
+        self.reject_promise(import_id, error)
 
     async def _handle_abort(self, error_expr: Any) -> None:
         """Handle an abort message from the server."""
@@ -232,30 +227,38 @@ class Client:
             error = RpcError.internal(f"Server aborted: {error_expr}")
 
         # Reject all pending promises
-        for future in self._pending_promises.values():
+        for promise_id, future in list(self._pending_promises.items()):
             if not future.done():
                 future.set_exception(error)
 
         self._pending_promises.clear()
 
-    async def _release_import(self, import_id: ImportId) -> None:
-        """Release an import by sending a release message."""
+    def _send_release_message(self, import_id: int) -> None:
+        """Send a release message to the remote side.
+
+        Args:
+            import_id: The import ID to release
+        """
         if not self._transport:
             return
 
         # Get reference count
         refcount = self._import_ref_counts.pop(import_id, 1)
 
-        # Send release message
-        release_msg = WireRelease(import_id.value, refcount)
-        batch = serialize_wire_batch([release_msg])
+        # Send release message (best-effort, non-blocking)
+        import asyncio
 
-        # Use transport abstraction (ignore errors on release - best-effort)
-        from contextlib import suppress
+        async def send_release():
+            if self._transport:
+                release_msg = WireRelease(import_id, refcount)
+                batch = serialize_wire_batch([release_msg])
+                from contextlib import suppress
 
-        with suppress(Exception):
-            await self._transport.send_and_receive(batch.encode("utf-8"))
-            # Release doesn't return a response typically
+                with suppress(Exception):
+                    await self._transport.send_and_receive(batch.encode("utf-8"))
+
+        # Schedule the release to run in the background
+        asyncio.create_task(send_release())
 
     def register_capability(self, export_id: int, target: RpcTarget) -> None:
         """Register a local capability that can be called by the server.
@@ -264,7 +267,7 @@ class Client:
             export_id: The export ID (should be negative for local exports)
             target: The RPC target implementation
         """
-        self._exports.add(ExportId(export_id), target)
+        self.register_target(export_id, target)
 
     def validate_resume_token(self, token: ResumeToken) -> bool:
         """Validate a resume token.
@@ -353,3 +356,86 @@ class Client:
         )
         batch._add_call(pending_call)
         return PipelinePromise(self, batch, import_id)
+
+    # RpcSession abstract method implementations
+
+    def send_pipeline_call(
+        self,
+        import_id: int,
+        path: list[str | int],
+        args: RpcPayload,
+        result_import_id: int,
+    ) -> None:
+        """Send a pipelined call message.
+
+        This is called by RpcImportHook when a call is made on a remote
+        capability.
+
+        Args:
+            import_id: The import ID to call on
+            path: Property path + method name
+            args: Arguments for the call
+            result_import_id: Import ID for the result
+        """
+        # For now, raise NotImplementedError - this will be used when we have
+        # WebSocket support for true pipelining
+        raise NotImplementedError(
+            "Direct pipelining not yet supported - use client.pipeline() instead"
+        )
+
+    def send_pipeline_get(
+        self,
+        import_id: int,
+        path: list[str | int],
+        result_import_id: int,
+    ) -> None:
+        """Send a pipelined property get message.
+
+        This is called by RpcImportHook when a property is accessed on a
+        remote capability.
+
+        Args:
+            import_id: The import ID to get from
+            path: Property path
+            result_import_id: Import ID for the result
+        """
+        raise NotImplementedError(
+            "Direct pipelining not yet supported - use client.pipeline() instead"
+        )
+
+    async def pull_import(self, import_id: int) -> RpcPayload:
+        """Pull the value from a remote capability.
+
+        This is called by RpcImportHook when awaiting a remote capability.
+
+        Args:
+            import_id: The import ID to pull
+
+        Returns:
+            The pulled value as RpcPayload
+        """
+        # Send a pull message and await the response
+        if not self._transport:
+            raise RpcError.internal("No transport available")
+
+        pull_msg = WirePull(import_id)
+        batch = serialize_wire_batch([pull_msg])
+
+        response_bytes = await self._transport.send_and_receive(batch.encode("utf-8"))
+        response_text = response_bytes.decode("utf-8")
+
+        if not response_text:
+            raise RpcError.internal("Empty response from pull")
+
+        # Parse responses
+        messages = parse_wire_batch(response_text)
+
+        for msg in messages:
+            if isinstance(msg, WireResolve) and msg.export_id == -import_id:
+                # Parse and return the value
+                return self.parser.parse(msg.value)
+            if isinstance(msg, WireReject) and msg.export_id == -import_id:
+                error = self._parse_error(msg.error)
+                raise error
+
+        raise RpcError.internal("No response for pull")

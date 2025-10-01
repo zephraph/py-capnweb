@@ -3,20 +3,24 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import traceback
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
 from capnweb.error import RpcError
-from capnweb.evaluator import ExpressionEvaluator
-from capnweb.ids import ExportId, IdAllocator, ImportId
+from capnweb.hooks import ErrorStubHook, StubHook
+from capnweb.ids import ImportId
+from capnweb.payload import RpcPayload
 from capnweb.resume import ResumeToken, ResumeTokenManager
-from capnweb.tables import ExportTable, ImportTable
+from capnweb.session import RpcSession
 from capnweb.wire import (
     WireAbort,
     WireError,
     WireMessage,
+    WirePipeline,
     WirePull,
     WirePush,
     WireReject,
@@ -41,11 +45,13 @@ class ServerConfig:
     resume_token_ttl: float = 3600.0  # Resume token TTL in seconds (1 hour)
 
 
-class Server:
+class Server(RpcSession):
     """Cap'n Web server implementation.
 
     Supports HTTP batch transport with the protocol endpoints:
     - POST /rpc/batch: HTTP batch RPC
+
+    Extends RpcSession to get unified import/export table management.
 
     Session State and Transport Considerations:
     -------------------------------------------
@@ -74,19 +80,43 @@ class Server:
     """
 
     def __init__(self, config: ServerConfig) -> None:
+        super().__init__()
         self.config = config
-        self._id_allocator = IdAllocator()
-        self._imports = ImportTable()
-        self._exports = ExportTable()
-        self._evaluator = ExpressionEvaluator(
-            self._imports, self._exports, is_server=True
-        )
         self._app: web.Application | None = None
         self._runner: web.AppRunner | None = None
-        self._pending_pulls: dict[ImportId, list[asyncio.Future[WireMessage]]] = {}
         self._resume_manager = ResumeTokenManager(
             default_ttl=self.config.resume_token_ttl
         )
+        # Track batch-local import tables for HTTP batch requests
+        self._batch_imports: dict[int, StubHook] = {}
+
+        # Create a wrapper that exposes both dict and ExportTable API
+        self._exports_wrapper = self._create_exports_wrapper()
+
+    def _create_exports_wrapper(self):
+        """Create a wrapper that provides both dict and ExportTable API."""
+        # Get the parent's _exports dict
+        parent_exports = self.__dict__.get("_exports", {})
+
+        class ExportsWrapper(dict):
+            """Wrapper that acts like both a dict and ExportTable."""
+
+            def contains(self, export_id):
+                """ExportTable API compatibility."""
+                if hasattr(export_id, "value"):
+                    return export_id.value in self
+                return export_id in self
+
+            @property
+            def _entries(self):
+                """ExportTable API compatibility."""
+                return self
+
+        # Create wrapper with parent's exports
+        wrapper = ExportsWrapper(parent_exports)
+        # Store it directly in __dict__
+        self.__dict__["_exports"] = wrapper
+        return wrapper
 
     def register_capability(self, export_id: int, target: RpcTarget) -> None:
         """Register a capability with the given export ID.
@@ -95,7 +125,7 @@ class Server:
             export_id: The export ID (typically 0 for main capability)
             target: The RPC target implementation
         """
-        self._exports.add(ExportId(export_id), target)
+        self.register_target(export_id, target)
 
     async def start(self) -> None:
         """Start the server."""
@@ -134,23 +164,22 @@ class Server:
             # Process messages
             # Create a batch-local import table for this request
             # (HTTP batch is stateless - each request is a micro-session)
-            batch_imports = ImportTable()
+            batch_imports: dict[int, StubHook] = {}
 
             # Track push sequence for this batch (client's import ID space)
             next_push_import_id = 1
             responses: list[WireMessage] = []
             for msg in messages:
+                # TODO: use a match statement
                 if isinstance(msg, WirePush):
                     # Assign the next sequential import ID for this push
-                    import_id = ImportId(next_push_import_id)
+                    import_id = next_push_import_id
                     next_push_import_id += 1
                     response = await self._handle_push(
                         msg.expression, import_id, batch_imports
                     )
                 elif isinstance(msg, WirePull):
-                    response = await self._handle_pull(
-                        ImportId(msg.import_id), batch_imports
-                    )
+                    response = await self._handle_pull(msg.import_id, batch_imports)
                 else:
                     response = await self._process_message(msg)
                 if response:
@@ -188,12 +217,12 @@ class Server:
                 return None
 
     async def _handle_push(
-        self, expression: Any, import_id: ImportId, imports: ImportTable
+        self, expression: Any, import_id: int, imports: dict[int, StubHook]
     ) -> WireMessage | None:
         """Handle a push message - evaluate expression and store result.
 
         Args:
-            expression: The expression to evaluate
+            expression: The expression to evaluate (WirePipeline)
             import_id: The import ID assigned sequentially for this push in the current batch
             imports: The batch-local import table
 
@@ -201,14 +230,56 @@ class Server:
         The server tracks these in the import table so they can be pulled later.
         """
         try:
-            # Evaluate the expression asynchronously
-            # Don't wait for promises - store the future
-            result_future: asyncio.Future[Any] = asyncio.create_task(
-                self._evaluator.evaluate(expression, resolve_promises=True)
+            # Parse the pipeline expression
+            if not isinstance(expression, WirePipeline):
+                raise RpcError.bad_request("Expected pipeline expression in push")
+
+            # Get the target hook (either from batch imports or our exports)
+            target_hook = imports.get(expression.import_id)
+            if target_hook is None:
+                target_hook = self.get_export_hook(expression.import_id)
+
+            if target_hook is None:
+                raise RpcError.not_found(f"Capability {expression.import_id} not found")
+
+            # Parse arguments
+            args_payload = (
+                self.parser.parse(expression.args)
+                if expression.args is not None
+                else RpcPayload.owned([])
             )
 
-            # Store in import table with the assigned import ID
-            imports.add(import_id, result_future)
+            # Extract the path - last element is the method, earlier are properties
+            path = [str(pk.value) for pk in (expression.property_path or [])]
+
+            # Ensure target_hook is not None before calling
+            if target_hook is None:
+                raise RpcError.not_found(
+                    f"Target hook is None for import {expression.import_id}"
+                )
+
+            # Call the target hook asynchronously
+            async def execute_call():
+                try:
+                    result_hook = await target_hook.call(path, args_payload)  # type: ignore[union-attr]
+                    return result_hook
+                except Exception as e:
+                    from capnweb.error import RpcError as RpcErr
+
+                    if isinstance(e, RpcErr):
+                        return ErrorStubHook(e)
+                    return ErrorStubHook(RpcErr.internal(f"Call failed: {e}"))
+
+            # Create a future for the result and store it
+            result_future: asyncio.Future[StubHook] = asyncio.create_task(
+                execute_call()
+            )
+
+            # Store in batch imports using a PromiseStubHook
+            from capnweb.hooks import PromiseStubHook
+
+            promise_hook = PromiseStubHook(result_future)
+            imports[import_id] = promise_hook
 
             # No immediate response - client will pull when ready
             return None
@@ -223,9 +294,9 @@ class Server:
                 else None
             )
             data = e.data if isinstance(e.data, dict) else None
-            error_expr = WireError(str(e.code), e.message, stack, data)
+            error_expr = WireError(str(e.code.value), e.message, stack, data)
             # Convert to export ID for the response
-            return WireReject(-import_id.value, error_expr)
+            return WireReject(-import_id, error_expr)
         except Exception as e:
             # Unexpected error - log it server-side but don't expose details to client
             import logging
@@ -238,29 +309,34 @@ class Server:
             stack = traceback.format_exc() if self.config.include_stack_traces else None
             error_expr = WireError("internal", "Internal server error", stack)
             # Convert to export ID for the response
-            return WireReject(-import_id.value, error_expr)
+            return WireReject(-import_id, error_expr)
 
     async def _handle_pull(
-        self, import_id: ImportId, imports: ImportTable
+        self, import_id: int, imports: dict[int, StubHook]
     ) -> WireMessage | None:
         """Handle a pull message - send resolution when ready."""
         try:
-            # Get the import (should be a future)
-            result = imports.get(import_id)
+            # Get the hook from batch imports
+            hook = imports.get(import_id)
 
-            # If it's a future, wait for it
-            if isinstance(result, asyncio.Future):
-                result = await result
+            if hook is None:
+                raise RpcError.not_found(f"Import {import_id} not found")
 
-            # Convert import ID to export ID for the response
-            export_id = import_id.to_export_id()
+            # Pull the payload from the hook
+            payload = await hook.pull()
+
+            # Serialize the value
+            serialized_value = self.serializer.serialize(payload.value)
+
+            # Convert import ID to export ID for the response (negate)
+            export_id = -import_id
 
             # Send resolution
-            return WireResolve(export_id.value, result)
+            return WireResolve(export_id, serialized_value)
 
         except RpcError as e:
             # Send rejection
-            export_id = import_id.to_export_id()
+            export_id = -import_id
             stack = (
                 str(e.data)
                 if e.data
@@ -269,20 +345,17 @@ class Server:
                 else None
             )
             data = e.data if isinstance(e.data, dict) else None
-            error_expr = WireError(str(e.code), e.message, stack, data)
-            return WireReject(export_id.value, error_expr)
+            error_expr = WireError(str(e.code.value), e.message, stack, data)
+            return WireReject(export_id, error_expr)
         except Exception as e:
             # Unexpected error - log but don't expose details
-            import logging
-            import traceback
-
             logger = logging.getLogger(__name__)
             logger.error(f"Unexpected error in pull: {e}", exc_info=True)
 
-            export_id = import_id.to_export_id()
+            export_id = -import_id
             stack = traceback.format_exc() if self.config.include_stack_traces else None
             error_expr = WireError("internal", "Internal server error", stack)
-            return WireReject(export_id.value, error_expr)
+            return WireReject(export_id, error_expr)
 
     def create_resume_token(
         self, metadata: dict[str, Any] | None = None
@@ -295,9 +368,10 @@ class Server:
         Returns:
             ResumeToken that can be used to restore this session
         """
-        # Snapshot current table state
-        imports_dict = self._imports.snapshot()
-        exports_dict = self._exports.snapshot()
+        # Snapshot current session state
+        # For now, we'll store just the export IDs since imports are batch-local
+        imports_dict = dict.fromkeys(self._imports.keys())  # Placeholder
+        exports_dict = dict.fromkeys(self._exports.keys())  # Placeholder
 
         return self._resume_manager.create_token(
             imports=imports_dict, exports=exports_dict, metadata=metadata
@@ -322,10 +396,12 @@ class Server:
         if not session_found:
             return False
 
-        # Restore table state (even if empty - empty session is valid)
-        self._imports.restore(imports_dict)
-        self._exports.restore(exports_dict)
+        # Restore exports into the wrapper
+        # The wrapper is a dict subclass, so we can update it directly
+        self._exports.clear()
+        self._exports.update(exports_dict)
 
+        # TODO: Properly restore import state when implementing full resume support
         return True
 
     def invalidate_resume_token(self, session_id: str) -> None:
@@ -353,8 +429,46 @@ class Server:
             import_id: The import ID to release
             refcount: The total number of times this import has been introduced
         """
-        # Release with the provided refcount
-        self._imports.release(import_id, refcount)
+        # Release the import
+        self.release_import(import_id.value)
 
         # No response needed for release
         return None
+
+    # RpcSession abstract method implementations
+
+    def send_pipeline_call(
+        self,
+        import_id: int,
+        path: list[str | int],
+        args: RpcPayload,
+        result_import_id: int,
+    ) -> None:
+        """Send a pipelined call message.
+
+        Not used in HTTP batch mode - raises NotImplementedError.
+        """
+        raise NotImplementedError(
+            "Pipelining from server not supported in HTTP batch mode"
+        )
+
+    def send_pipeline_get(
+        self,
+        import_id: int,
+        path: list[str | int],
+        result_import_id: int,
+    ) -> None:
+        """Send a pipelined property get message.
+
+        Not used in HTTP batch mode - raises NotImplementedError.
+        """
+        raise NotImplementedError(
+            "Pipelining from server not supported in HTTP batch mode"
+        )
+
+    async def pull_import(self, import_id: int) -> RpcPayload:
+        """Pull the value from a remote capability.
+
+        Not used in HTTP batch mode - raises NotImplementedError.
+        """
+        raise NotImplementedError("Pull from server not supported in HTTP batch mode")

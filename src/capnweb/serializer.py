@@ -1,0 +1,148 @@
+"""Serializer (Devaluator) for converting Python objects to wire format.
+
+This module replaces the old ExpressionEvaluator's serialization logic with
+a cleaner, more explicit approach. The Serializer takes Python objects and,
+with the help of an Exporter (the RpcSession), converts them to JSON-serializable
+wire expressions.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Protocol
+
+from capnweb.payload import RpcPayload
+from capnweb.wire import WireError, WireExport
+
+if TYPE_CHECKING:
+    from capnweb.error import RpcError
+    from capnweb.stubs import RpcPromise, RpcStub
+
+
+class Exporter(Protocol):
+    """Protocol for objects that can export capabilities.
+
+    This is typically implemented by RpcSession (Client/Server).
+    """
+
+    def export_capability(self, stub: RpcStub | RpcPromise) -> int:
+        """Export a capability and return its export ID.
+
+        Args:
+            stub: The RpcStub or RpcPromise to export
+
+        Returns:
+            The export ID assigned to this capability
+        """
+        ...
+
+
+# TODO: make it a dataclass
+class Serializer:
+    """Converts Python objects to wire format for RPC transmission.
+
+    This class (called Devaluator in TypeScript) is responsible for:
+    1. Taking Python objects and converting them to JSON-serializable structures
+    2. Finding RpcStub and RpcPromise instances and exporting them
+    3. Replacing stubs/promises with ["export", id] or ["promise", id] expressions
+    4. Handling errors by converting them to ["error", ...] expressions
+
+    The key difference from the old evaluator: this is a pure, stateless
+    transformation. All state management happens in the RpcSession (Exporter).
+    """
+
+    def __init__(self, exporter: Exporter) -> None:
+        """Initialize with an exporter.
+
+        Args:
+            exporter: The RpcSession that manages export IDs
+        """
+        self.exporter = exporter
+
+    def serialize(self, value: Any) -> Any:
+        """Serialize a Python value to wire format.
+
+        This is the main entry point. It recursively walks the object tree
+        and converts it to a JSON-serializable structure.
+
+        Args:
+            value: The Python value to serialize (could be anything)
+
+        Returns:
+            A JSON-serializable wire expression
+        """
+        # Import here to avoid circular dependencies
+        from capnweb.error import RpcError
+        from capnweb.stubs import RpcPromise, RpcStub
+
+        # TODO: use match statement
+
+        # Handle None and primitives
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+
+        # Handle RPC errors
+        if isinstance(value, RpcError):
+            return self._serialize_error(value)
+
+        # Handle RPC stubs - export them
+        if isinstance(value, RpcStub):
+            export_id = self.exporter.export_capability(value)
+            return WireExport(export_id).to_json()
+
+        # Handle RPC promises - export them as promises
+        if isinstance(value, RpcPromise):
+            export_id = self.exporter.export_capability(value)
+            # Promises are exported with their promise ID
+            from capnweb.wire import WirePromise
+
+            return WirePromise(export_id).to_json()
+
+        # Handle lists
+        if isinstance(value, list):
+            return [self.serialize(item) for item in value]
+
+        # Handle dicts
+        if isinstance(value, dict):
+            return {key: self.serialize(val) for key, val in value.items()}
+
+        # Handle RpcPayload - serialize its value
+        if isinstance(value, RpcPayload):
+            # Ensure it's owned first
+            value.ensure_deep_copied()
+            return self.serialize(value.value)
+
+        # For other types, try to serialize as-is
+        # (might fail at JSON encoding time)
+        return value
+
+    def _serialize_error(self, error: RpcError) -> list[Any]:
+        """Serialize an RpcError to wire format.
+
+        Args:
+            error: The error to serialize
+
+        Returns:
+            A ["error", type, message, ...] array
+        """
+        wire_error = WireError(
+            error_type=error.code.value,
+            message=error.message,
+            stack=None,  # Stack traces handled by security policy
+            data=error.data,
+        )
+        return wire_error.to_json()
+
+    def serialize_payload(self, payload: RpcPayload) -> Any:
+        """Serialize an RpcPayload to wire format.
+
+        This is a convenience method that ensures the payload is owned
+        before serializing its value.
+
+        Args:
+            payload: The payload to serialize
+
+        Returns:
+            A JSON-serializable wire expression
+        """
+        payload.ensure_deep_copied()
+        return self.serialize(payload.value)
