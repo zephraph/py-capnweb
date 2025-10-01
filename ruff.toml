@@ -36,4 +36,5 @@ lint.extend-ignore = [
     "INP001", #  	[ ] implicit-namespace-package
     "ASYNC110", #	[ ] async-busy-wait
     "EXE001", #  	[ ] shebang-not-executable
+    "PLC1901",
 ]

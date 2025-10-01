@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `stubs.py` - 58% → 100% coverage (+26 tests)
 - `parser.py` - 47% → 98% coverage (+30 tests)
 - `hooks.py` - 54% → 86% coverage (+36 tests)
-- 123 new tests added (280 total, up from 179)
-- Test coverage now at 84% overall (up from 67%)
+- `serializer.py` - 68% → 100% coverage (+26 tests)
+- `payload.py` - 84% → 100% coverage (+23 tests)
+- 172 new tests added (329 total, up from 179)
+- Test coverage now at 85% overall (up from 67%)
 
 ### Changed
 - Improved code quality and reduced cyclomatic complexity in 8 functions
