@@ -7,10 +7,9 @@ import logging
 import traceback
 from collections import UserDict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
 from aiohttp import web
-from typing_extensions import Self
 
 from capnweb.error import RpcError
 from capnweb.hooks import ErrorStubHook, PromiseStubHook, StubHook
@@ -119,6 +118,7 @@ class Server(RpcSession):
         self.config = config
         self._app: web.Application | None = None
         self._runner: web.AppRunner | None = None
+        self._site: web.TCPSite | None = None
         self._resume_manager = ResumeTokenManager(
             default_ttl=self.config.resume_token_ttl
         )
@@ -176,6 +176,16 @@ class Server(RpcSession):
         """Exit async context manager - stops the server."""
         await self.stop()
 
+    @property
+    def port(self) -> int:
+        """Get the actual bound port (useful when port=0 for dynamic allocation)."""
+        if self._site is None:
+            return self.config.port
+        # Get the first server socket from the site
+        if self._site._server:  # noqa: SLF001
+            return self._site._server.sockets[0].getsockname()[1]  # noqa: SLF001  # type: ignore[union-attr]
+        return self.config.port
+
     async def start(self) -> None:
         """Start the server."""
         self._app = web.Application()
@@ -184,10 +194,10 @@ class Server(RpcSession):
         self._runner = web.AppRunner(self._app)
         await self._runner.setup()
 
-        site = web.TCPSite(self._runner, self.config.host, self.config.port)
-        await site.start()
+        self._site = web.TCPSite(self._runner, self.config.host, self.config.port)
+        await self._site.start()
 
-        print(f"Server listening on {self.config.host}:{self.config.port}")
+        print(f"Server listening on {self.config.host}:{self.port}")
 
     async def stop(self) -> None:
         """Stop the server."""

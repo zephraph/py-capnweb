@@ -21,7 +21,7 @@ class ErrorCode(Enum):
         return self.value
 
 
-@dataclass(frozen=True)
+@dataclass
 class RpcError(Exception):
     """RPC error with code, message, and optional data."""
 

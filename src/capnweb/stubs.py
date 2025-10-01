@@ -8,9 +8,7 @@ provide a natural, Proxy-like API.
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, Self
 
 from capnweb.payload import RpcPayload
 

@@ -18,9 +18,7 @@ import inspect
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, Self
 
 from capnweb.error import RpcError
 from capnweb.payload import RpcPayload

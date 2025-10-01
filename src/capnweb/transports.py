@@ -6,10 +6,9 @@ for different communication methods (HTTP batch, WebSocket, etc.).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Self
 
 import aiohttp
-from typing_extensions import Self
 
 
 class HttpBatchTransport:

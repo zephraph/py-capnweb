@@ -5,17 +5,16 @@ from __future__ import annotations
 import asyncio
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
-
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Any, Self
 
 from capnweb.error import ErrorCode, RpcError
-from capnweb.hooks import PayloadStubHook
+from capnweb.hooks import ErrorStubHook, PayloadStubHook, TargetStubHook
 from capnweb.ids import ExportId
 from capnweb.payload import RpcPayload
 from capnweb.pipeline import PendingCall, PipelineBatch, PipelinePromise
 from capnweb.resume import ResumeToken  # noqa: TC001
 from capnweb.session import RpcSession
+from capnweb.stubs import RpcStub
 from capnweb.transports import HttpBatchTransport, WebSocketTransport, create_transport
 from capnweb.wire import (
     PropertyKey,
@@ -273,6 +272,34 @@ class Client(RpcSession):
         """
         self.register_target(export_id, target)
 
+    def create_stub(
+        self, target: RpcTarget
+    ) -> Any:  # Returns RpcStub but avoiding circular import
+        """Create a stub for a local capability that can be passed to the server.
+
+        This allocates an export ID and registers the target, returning an RpcStub
+        that can be passed as an argument to server methods.
+
+        Args:
+            target: The local RpcTarget to export
+
+        Returns:
+            RpcStub that references the exported capability
+        """
+        # Create hook for the target
+        hook = TargetStubHook(target)
+
+        # Allocate next export ID
+        export_id = len(self._exports)
+        while export_id in self._exports:
+            export_id += 1
+
+        # Store the hook in exports so the serializer can find it
+        self._exports[export_id] = hook
+
+        # Return stub wrapping the hook
+        return RpcStub(hook)
+
     def validate_resume_token(self, token: ResumeToken) -> bool:
         """Validate a resume token.
 
@@ -373,7 +400,8 @@ class Client(RpcSession):
         """Send a pipelined call message.
 
         This is called by RpcImportHook when a call is made on a remote
-        capability.
+        capability. Since HTTP batch transport can't pipeline, we need to
+        send immediately and block.
 
         Args:
             import_id: The import ID to call on
@@ -381,10 +409,59 @@ class Client(RpcSession):
             args: Arguments for the call
             result_import_id: Import ID for the result
         """
-        # For now, raise NotImplementedError - this will be used when we have
-        # WebSocket support for true pipelining
-        msg = "Direct pipelining not yet supported - use client.pipeline() instead"
-        raise NotImplementedError(msg)
+        # For HTTP batch, we can't truly pipeline - we have to send immediately
+        # Create a task that will be resolved when the result comes back
+
+        # Build property path for the wire message
+        path_keys = [PropertyKey(p) for p in path]
+
+        # Serialize arguments
+        serialized_args = self.serializer.serialize_payload(args)
+
+        # Create pipeline expression
+        pipeline_expr = WirePipeline(
+            import_id=import_id,
+            property_path=path_keys,
+            args=serialized_args,
+        )
+
+        # Create push and pull messages
+        push_msg = WirePush(pipeline_expr)
+        pull_msg = WirePull(result_import_id)
+
+        # Send immediately in a background task
+        async def send_and_handle():
+            if not self._transport:
+                return
+
+            batch = serialize_wire_batch([push_msg, pull_msg])
+            response_bytes = await self._transport.send_and_receive(
+                batch.encode("utf-8")
+            )
+            response_text = response_bytes.decode("utf-8")
+
+            # Parse response and resolve the pending import
+            messages = parse_wire_batch(response_text)
+            for msg in messages:
+                if isinstance(msg, WireResolve) and msg.export_id == -result_import_id:
+                    result_payload = self.parser.parse(msg.value)
+                    # Get the future for this import
+                    if result_import_id in self._pending_promises:
+                        future = self._pending_promises.pop(result_import_id)
+                        if not future.done():
+                            # Create hook from the payload
+                            result_hook = PayloadStubHook(result_payload)
+                            future.set_result(result_hook)
+                elif isinstance(msg, WireReject) and msg.export_id == -result_import_id:
+                    error = self._parse_error(msg.error)
+                    if result_import_id in self._pending_promises:
+                        future = self._pending_promises.pop(result_import_id)
+                        if not future.done():
+                            error_hook = ErrorStubHook(error)
+                            future.set_result(error_hook)
+
+        # Schedule the task
+        asyncio.create_task(send_and_handle())
 
     def send_pipeline_get(
         self,
@@ -402,8 +479,8 @@ class Client(RpcSession):
             path: Property path
             result_import_id: Import ID for the result
         """
-        msg = "Direct pipelining not yet supported - use client.pipeline() instead"
-        raise NotImplementedError(msg)
+        # Similar to send_pipeline_call but with no args
+        self.send_pipeline_call(import_id, path, RpcPayload.owned([]), result_import_id)
 
     async def pull_import(self, import_id: int) -> RpcPayload:
         """Pull the value from a remote capability.
