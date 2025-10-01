@@ -8,6 +8,7 @@ wire expressions.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 from capnweb.payload import RpcPayload
@@ -36,7 +37,7 @@ class Exporter(Protocol):
         ...
 
 
-# TODO: make it a dataclass
+@dataclass
 class Serializer:
     """Converts Python objects to wire format for RPC transmission.
 
@@ -50,13 +51,7 @@ class Serializer:
     transformation. All state management happens in the RpcSession (Exporter).
     """
 
-    def __init__(self, exporter: Exporter) -> None:
-        """Initialize with an exporter.
-
-        Args:
-            exporter: The RpcSession that manages export IDs
-        """
-        self.exporter = exporter
+    exporter: Exporter
 
     def serialize(self, value: Any) -> Any:
         """Serialize a Python value to wire format.
@@ -74,46 +69,46 @@ class Serializer:
         from capnweb.error import RpcError
         from capnweb.stubs import RpcPromise, RpcStub
 
-        # TODO: use match statement
+        match value:
+            case None | bool() | int() | float() | str():
+                # Handle None and primitives
+                return value
 
-        # Handle None and primitives
-        if value is None or isinstance(value, (bool, int, float, str)):
-            return value
+            case RpcError():
+                # Handle RPC errors
+                return self._serialize_error(value)
 
-        # Handle RPC errors
-        if isinstance(value, RpcError):
-            return self._serialize_error(value)
+            case RpcStub():
+                # Handle RPC stubs - export them
+                export_id = self.exporter.export_capability(value)
+                return WireExport(export_id).to_json()
 
-        # Handle RPC stubs - export them
-        if isinstance(value, RpcStub):
-            export_id = self.exporter.export_capability(value)
-            return WireExport(export_id).to_json()
+            case RpcPromise():
+                # Handle RPC promises - export them as promises
+                export_id = self.exporter.export_capability(value)
+                # Promises are exported with their promise ID
+                from capnweb.wire import WirePromise
 
-        # Handle RPC promises - export them as promises
-        if isinstance(value, RpcPromise):
-            export_id = self.exporter.export_capability(value)
-            # Promises are exported with their promise ID
-            from capnweb.wire import WirePromise
+                return WirePromise(export_id).to_json()
 
-            return WirePromise(export_id).to_json()
+            case list():
+                # Handle lists
+                return [self.serialize(item) for item in value]
 
-        # Handle lists
-        if isinstance(value, list):
-            return [self.serialize(item) for item in value]
+            case dict():
+                # Handle dicts
+                return {key: self.serialize(val) for key, val in value.items()}
 
-        # Handle dicts
-        if isinstance(value, dict):
-            return {key: self.serialize(val) for key, val in value.items()}
+            case RpcPayload():
+                # Handle RpcPayload - serialize its value
+                # Ensure it's owned first
+                value.ensure_deep_copied()
+                return self.serialize(value.value)
 
-        # Handle RpcPayload - serialize its value
-        if isinstance(value, RpcPayload):
-            # Ensure it's owned first
-            value.ensure_deep_copied()
-            return self.serialize(value.value)
-
-        # For other types, try to serialize as-is
-        # (might fail at JSON encoding time)
-        return value
+            case _:
+                # For other types, try to serialize as-is
+                # (might fail at JSON encoding time)
+                return value
 
     def _serialize_error(self, error: RpcError) -> list[Any]:
         """Serialize an RpcError to wire format.

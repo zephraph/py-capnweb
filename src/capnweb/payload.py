@@ -7,6 +7,7 @@ to shared mutable state and ensures resources are properly released.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
@@ -28,7 +29,7 @@ class PayloadSource(Enum):
     OWNED = auto()  # Deserialized or copied. We own it.
 
 
-# TODO: make it a dataclass
+@dataclass
 class RpcPayload:
     """Wraps data with explicit ownership semantics for RPC transmission.
 
@@ -58,22 +59,16 @@ class RpcPayload:
         ```
     """
 
-    def __init__(self, value: Any, source: PayloadSource) -> None:
-        """Initialize an RPC payload.
-
-        Args:
-            value: The wrapped data (can be any Python object)
-            source: Where this data came from (provenance)
-        """
-        self.value = value
-        self.source = source
-
-        # These are only populated when source is OWNED (after deep copy)
-        # They track all RPC references within this payload for lifecycle management
-        self.stubs: list[RpcStub] = []  # All RpcStub instances found in value
-        self.promises: list[
-            tuple[Any, str | int, RpcPromise]
-        ] = []  # (parent, property, promise)
+    value: Any
+    source: PayloadSource
+    # These are only populated when source is OWNED (after deep copy)
+    # They track all RPC references within this payload for lifecycle management
+    stubs: list[RpcStub] = field(
+        default_factory=list
+    )  # All RpcStub instances found in value
+    promises: list[tuple[Any, str | int, RpcPromise]] = field(
+        default_factory=list
+    )  # (parent, property, promise)
 
     @classmethod
     def from_app_params(cls, value: Any) -> RpcPayload:
@@ -131,17 +126,16 @@ class RpcPayload:
         After calling this, the payload is safe to use and modify within the
         RPC system without worrying about corrupting application state.
         """
-        # TODO: use match statement
-        if self.source == PayloadSource.OWNED:
-            # Already owned, nothing to do
-            return
-
-        if self.source == PayloadSource.PARAMS:
-            # Must deep-copy to prevent mutating application data
-            self.value = self._deep_copy_and_track(self.value)
-        elif self.source == PayloadSource.RETURN:
-            # Application gave us ownership, but we still need to track stubs/promises
-            self._track_references(self.value)
+        match self.source:
+            case PayloadSource.OWNED:
+                # Already owned, nothing to do
+                return
+            case PayloadSource.PARAMS:
+                # Must deep-copy to prevent mutating application data
+                self.value = self._deep_copy_and_track(self.value)
+            case PayloadSource.RETURN:
+                # Application gave us ownership, but we still need to track stubs/promises
+                self._track_references(self.value)
 
         # Now we own this data
         self.source = PayloadSource.OWNED
@@ -158,45 +152,50 @@ class RpcPayload:
         # Import here to avoid circular dependency
         from capnweb.stubs import RpcPromise, RpcStub
 
-        # TODO: use match statement
-
         # Handle RpcStub and RpcPromise specially - don't copy them,
         # but track them and duplicate their hooks
-        if isinstance(obj, (RpcStub, RpcPromise)):
-            # Create a duplicate (shares the hook, increments refcount)
-            dup = obj._hook.dup()
-            if isinstance(obj, RpcStub):
+        match obj:
+            case RpcStub():
+                # Create a duplicate (shares the hook, increments refcount)
+                dup = obj._hook.dup()
                 from capnweb.stubs import RpcStub as StubClass
 
                 new_stub = StubClass(dup)
                 self.stubs.append(new_stub)
                 return new_stub
-            from capnweb.stubs import RpcPromise as PromiseClass
 
-            new_promise = PromiseClass(dup)
-            # Note: parent and property tracking would happen at the container level
-            return new_promise
+            case RpcPromise():
+                # Create a duplicate (shares the hook, increments refcount)
+                dup = obj._hook.dup()
+                from capnweb.stubs import RpcPromise as PromiseClass
 
-        # Handle primitive types - return as-is (immutable)
-        if obj is None or isinstance(obj, (bool, int, float, str, bytes)):
-            return obj
+                new_promise = PromiseClass(dup)
+                # Note: parent and property tracking would happen at the container level
+                return new_promise
 
-        # Handle lists
-        if isinstance(obj, list):
-            return [self._deep_copy_and_track(item) for item in obj]
+            case None | bool() | int() | float() | str() | bytes():
+                # Handle primitive types - return as-is (immutable)
+                return obj
 
-        # Handle dicts
-        if isinstance(obj, dict):
-            return {key: self._deep_copy_and_track(value) for key, value in obj.items()}
+            case list():
+                # Handle lists
+                return [self._deep_copy_and_track(item) for item in obj]
 
-        # For other types, try to copy using copy module
-        import copy
+            case dict():
+                # Handle dicts
+                return {
+                    key: self._deep_copy_and_track(value) for key, value in obj.items()
+                }
 
-        try:
-            return copy.deepcopy(obj)
-        except Exception:
-            # If deepcopy fails, return as-is and hope it's immutable
-            return obj
+            case _:
+                # For other types, try to copy using copy module
+                import copy
+
+                try:
+                    return copy.deepcopy(obj)
+                except Exception:
+                    # If deepcopy fails, return as-is and hope it's immutable
+                    return obj
 
     def _track_references(
         self, obj: Any, parent: Any = None, key: str | int | None = None
@@ -210,20 +209,20 @@ class RpcPayload:
         """
         from capnweb.stubs import RpcPromise, RpcStub
 
-        # TODO: use match statement
-        if isinstance(obj, RpcStub):
-            self.stubs.append(obj)
-        elif isinstance(obj, RpcPromise):
-            if parent is not None and key is not None:
-                self.promises.append((parent, key, obj))
-
-        # Recursively track in containers
-        if isinstance(obj, list):
-            for i, item in enumerate(obj):
-                self._track_references(item, obj, i)
-        elif isinstance(obj, dict):
-            for k, v in obj.items():
-                self._track_references(v, obj, k)
+        match obj:
+            case RpcStub():
+                self.stubs.append(obj)
+            case RpcPromise():
+                if parent is not None and key is not None:
+                    self.promises.append((parent, key, obj))
+            case list():
+                # Recursively track in lists
+                for i, item in enumerate(obj):
+                    self._track_references(item, obj, i)
+            case dict():
+                # Recursively track in dicts
+                for k, v in obj.items():
+                    self._track_references(v, obj, k)
 
     def dispose(self) -> None:
         """Recursively dispose all RPC stubs and promises in this payload.

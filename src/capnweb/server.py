@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
+from typing_extensions import Self
 
 from capnweb.error import RpcError
 from capnweb.hooks import ErrorStubHook, StubHook
@@ -128,6 +129,15 @@ class Server(RpcSession):
         """
         self.register_target(export_id, target)
 
+    async def __aenter__(self) -> Self:
+        """Enter async context manager - starts the server."""
+        await self.start()
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        """Exit async context manager - stops the server."""
+        await self.stop()
+
     async def start(self) -> None:
         """Start the server."""
         self._app = web.Application()
@@ -171,18 +181,19 @@ class Server(RpcSession):
             next_push_import_id = 1
             responses: list[WireMessage] = []
             for msg in messages:
-                # TODO: use a match statement
-                if isinstance(msg, WirePush):
-                    # Assign the next sequential import ID for this push
-                    import_id = next_push_import_id
-                    next_push_import_id += 1
-                    response = await self._handle_push(
-                        msg.expression, import_id, batch_imports
-                    )
-                elif isinstance(msg, WirePull):
-                    response = await self._handle_pull(msg.import_id, batch_imports)
-                else:
-                    response = await self._process_message(msg)
+                match msg:
+                    case WirePush():
+                        # Assign the next sequential import ID for this push
+                        import_id = next_push_import_id
+                        next_push_import_id += 1
+                        response = await self._handle_push(
+                            msg.expression, import_id, batch_imports
+                        )
+                    case WirePull():
+                        response = await self._handle_pull(msg.import_id, batch_imports)
+                    case _:
+                        response = await self._process_message(msg)
+
                 if response:
                     responses.append(response)
 

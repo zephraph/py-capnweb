@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from capnweb.payload import RpcPayload
@@ -96,7 +97,7 @@ class StubHook(ABC):
         ...
 
 
-# TODO: make it a dataclass
+@dataclass
 class ErrorStubHook(StubHook):
     """A hook that holds an error.
 
@@ -104,13 +105,7 @@ class ErrorStubHook(StubHook):
     This is useful for representing failed promises or broken capabilities.
     """
 
-    def __init__(self, error: RpcError) -> None:
-        """Initialize with an error.
-
-        Args:
-            error: The error this hook represents
-        """
-        self.error = error
+    error: RpcError
 
     async def call(self, path: list[str | int], args: RpcPayload) -> StubHook:
         """Always returns self (errors propagate through chains)."""
@@ -245,7 +240,7 @@ class PayloadStubHook(StubHook):
         return PayloadStubHook(self.payload)
 
 
-# TODO: make it a dataclass
+@dataclass
 class TargetStubHook(StubHook):
     """A hook that wraps a local RpcTarget object.
 
@@ -253,14 +248,8 @@ class TargetStubHook(StubHook):
     delegates method calls to the actual Python object.
     """
 
-    def __init__(self, target: RpcTarget) -> None:
-        """Initialize with an RPC target.
-
-        Args:
-            target: The RpcTarget implementation
-        """
-        self.target = target
-        self.ref_count = 1  # For disposal tracking
+    target: RpcTarget
+    ref_count: int = 1  # For disposal tracking
 
     async def call(self, path: list[str | int], args: RpcPayload) -> StubHook:
         """Call a method on the target.
@@ -359,7 +348,7 @@ class TargetStubHook(StubHook):
         return self
 
 
-# TODO: make it a dataclass
+@dataclass
 class RpcImportHook(StubHook):
     """A hook representing a remote capability.
 
@@ -367,16 +356,9 @@ class RpcImportHook(StubHook):
     It tracks the import ID and delegates to the session for actual I/O.
     """
 
-    def __init__(self, session: RpcSession, import_id: int) -> None:
-        """Initialize with a session and import ID.
-
-        Args:
-            session: The RpcSession managing this import
-            import_id: The import ID for this capability
-        """
-        self.session = session
-        self.import_id = import_id
-        self.ref_count = 1
+    session: RpcSession
+    import_id: int
+    ref_count: int = 1
 
     async def call(self, path: list[str | int], args: RpcPayload) -> StubHook:
         """Call a method on the remote capability.
@@ -440,7 +422,7 @@ class RpcImportHook(StubHook):
         return self
 
 
-# TODO: make it a dataclass
+@dataclass
 class PromiseStubHook(StubHook):
     """A hook wrapping a future that will resolve to another hook.
 
@@ -448,13 +430,7 @@ class PromiseStubHook(StubHook):
     Operations on this hook create chained promises.
     """
 
-    def __init__(self, future: asyncio.Future[StubHook]) -> None:
-        """Initialize with a future hook.
-
-        Args:
-            future: The future that will resolve to a StubHook
-        """
-        self.future = future
+    future: asyncio.Future[StubHook]
 
     async def call(self, path: list[str | int], args: RpcPayload) -> StubHook:
         """Wait for the promise to resolve, then call on the result.
