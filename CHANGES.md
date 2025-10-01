@@ -8,16 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Comprehensive test coverage for `session.py` (44% → 99%)
-- Comprehensive test coverage for `stubs.py` (58% → 100%)
-- 57 new tests covering session management and RPC stubs/promises
-- Test coverage now at 71% overall (up from 67%)
+- Comprehensive test coverage improvements across core modules
+- `session.py` - 44% → 99% coverage (+31 tests)
+- `stubs.py` - 58% → 100% coverage (+26 tests)
+- `parser.py` - 47% → 98% coverage (+30 tests)
+- `hooks.py` - 54% → 86% coverage (+36 tests)
+- 123 new tests added (280 total, up from 179)
+- Test coverage now at 84% overall (up from 67%)
 
 ### Changed
 - Improved code quality and reduced cyclomatic complexity in 8 functions
 - Refactored `TestService.call()` with dispatch table pattern
 - Extracted helper methods in `PipelineBatch._execute()`
 - Simplified `TargetStubHook.call()` with method extraction
+
+### Removed
+- **Legacy code cleanup** - removed monolithic evaluator and table abstractions
+- `evaluator.py` (286 lines, 31% coverage) - replaced by parser + serializer + hooks
+- `tables.py` (82 lines, 0% coverage) - replaced by RpcSession
+- `test_remap_evaluation.py` - tests for removed evaluator
+- `test_tables.py` - tests for removed tables module
+- Architecture now fully hook-based with no legacy code paths
 
 ### Fixed
 - Moved all imports to top-level (resolved 61 PLC0415 violations)
