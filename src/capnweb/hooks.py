@@ -268,6 +268,71 @@ class TargetStubHook(StubHook):
     target: RpcTarget
     ref_count: int = 1  # For disposal tracking
 
+    async def _navigate_to_target(self, property_path: list[str | int]) -> Any:
+        """Navigate through properties to reach the target object.
+
+        Args:
+            property_path: List of properties to navigate
+
+        Returns:
+            The target object after navigation
+
+        Raises:
+            RpcError: If navigation fails
+        """
+        current_obj = self.target
+        for prop in property_path:
+            try:
+                prop_value = await current_obj.get_property(str(prop))
+                current_obj = prop_value
+            except Exception as e:  # noqa: PERF203
+                if isinstance(e, RpcError):
+                    raise
+                msg = f"Property navigation failed at path {property_path}: {e}"
+                raise RpcError.not_found(msg) from e
+        return current_obj
+
+    async def _invoke_method(
+        self, target: Any, method_name: str, args: RpcPayload
+    ) -> Any:
+        """Invoke a method on the target object.
+
+        Args:
+            target: The target object
+            method_name: Name of the method to call
+            args: Arguments for the method
+
+        Returns:
+            The method result
+
+        Raises:
+            RpcError: If the method call fails
+        """
+        # If target is an RpcTarget, use its call method
+        if hasattr(target, "call") and callable(target.call):
+            return await target.call(  # type: ignore[misc]
+                method_name,
+                args.value if isinstance(args.value, list) else [args.value],
+            )
+
+        # Otherwise, try to call the method directly on the object
+        method = getattr(target, method_name)
+        if not callable(method):
+            msg = f"Method {method_name} is not callable"
+            raise RpcError.bad_request(msg)
+
+        # Handle async and sync methods
+        if inspect.iscoroutinefunction(method):
+            return (
+                await method(*args.value)
+                if isinstance(args.value, list)
+                else await method(args.value)
+            )
+
+        return (
+            method(*args.value) if isinstance(args.value, list) else method(args.value)
+        )
+
     async def call(self, path: list[str | int], args: RpcPayload) -> StubHook:
         """Call a method on the target.
 
@@ -278,73 +343,31 @@ class TargetStubHook(StubHook):
         Returns:
             A new hook with the result
         """
-
         args.ensure_deep_copied()
 
-        # The last element of path is the method name
-        # Earlier elements are properties to navigate
         if not path:
             error = RpcError.bad_request("Cannot call target without method name")
             return ErrorStubHook(error)
 
-        # Handle property navigation before call
+        # Determine method name and target object
         if len(path) == 1:
-            # Simple case: just call the method directly
             method_name = str(path[0])
             current_target = self.target
         else:
-            # Navigate through properties to reach the final target
             property_path = path[:-1]
             method_name = str(path[-1])
-
-            # Get nested property
             try:
-                current_obj = self.target
-                for prop in property_path:
-                    prop_value = await current_obj.get_property(str(prop))
-                    current_obj = prop_value
-                current_target = current_obj
-            except Exception as e:
-                if isinstance(e, RpcError):
-                    return ErrorStubHook(e)
-                error = RpcError.not_found(
-                    f"Property navigation failed at path {property_path}: {e}"
-                )
-                return ErrorStubHook(error)
-
-        try:
-            # If current_target is the original RpcTarget, use its call method
-            if hasattr(current_target, "call") and callable(current_target.call):
-                result = await current_target.call(  # type: ignore[misc]
-                    method_name,
-                    args.value if isinstance(args.value, list) else [args.value],
-                )
-            else:
-                # Otherwise, try to call the method directly on the object
-                method = getattr(current_target, method_name)
-                if callable(method):
-                    if inspect.iscoroutinefunction(method):
-                        result = (
-                            await method(*args.value)
-                            if isinstance(args.value, list)
-                            else await method(args.value)
-                        )
-                    else:
-                        result = (
-                            method(*args.value)
-                            if isinstance(args.value, list)
-                            else method(args.value)
-                        )
-                else:
-                    error = RpcError.bad_request(
-                        f"Method {method_name} is not callable"
-                    )
-                    return ErrorStubHook(error)
-
-            return PayloadStubHook(RpcPayload.from_app_return(result))
-        except Exception as e:
-            if isinstance(e, RpcError):
+                current_target = await self._navigate_to_target(property_path)
+            except RpcError as e:
                 return ErrorStubHook(e)
+
+        # Invoke the method
+        try:
+            result = await self._invoke_method(current_target, method_name, args)
+            return PayloadStubHook(RpcPayload.from_app_return(result))
+        except RpcError as e:
+            return ErrorStubHook(e)
+        except Exception as e:
             error = RpcError.internal(f"Target call failed: {e}")
             return ErrorStubHook(error)
 

@@ -48,7 +48,7 @@ class ExpressionEvaluator:
         self._exports = exports
         self._is_server = is_server
 
-    async def evaluate(
+    async def evaluate(  # noqa: C901
         self, expr: WireExpression, resolve_promises: bool = True
     ) -> Any:
         """Evaluate a wire expression to a concrete value.
@@ -269,7 +269,7 @@ class ExpressionEvaluator:
 
         return await target.get_property(property)
 
-    async def _evaluate_remap(
+    async def _evaluate_remap(  # noqa: C901
         self, remap: WireRemap, resolve_promises: bool = True
     ) -> Any:
         """Evaluate a remap expression (implements .map() operation).
@@ -401,7 +401,7 @@ class RemapExpressionEvaluator:
         self._base_exports = base_exports
         self._is_server = is_server
 
-    async def evaluate_instruction(
+    async def evaluate_instruction(  # noqa: C901
         self, expr: WireExpression, results: list[Any]
     ) -> Any:
         """Evaluate a single instruction in the remap context.

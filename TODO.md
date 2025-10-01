@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**v0.3.0 - Promise Pipelining Complete** ✅
+**v0.3.1-dev - Test Coverage & Code Quality** 🚧
 
 - ✅ Core protocol types (IDs, errors, wire format)
 - ✅ HTTP batch transport (client & server)
@@ -19,7 +19,65 @@
 - ✅ Bidirectional RPC (peer-to-peer)
 - ✅ Resume tokens for session restoration
 - ✅ Promise pipelining (batching calls)
-- ✅ 165 tests, 74% coverage
+- ✅ TypeScript interoperability (array escaping)
+- ✅ Code quality improvements (reduced cyclomatic complexity)
+- ✅ 236 tests, 71% coverage
+
+**See [CHANGES.md](CHANGES.md) for detailed changelog.**
+
+---
+
+## Next Steps (Priority Order)
+
+### 1. Test Coverage Improvements (High Priority)
+**Current:** 71% coverage, **Target:** 80%+
+
+**Completed:**
+- ✅ `session.py` - 44% → 99% (+55 points)
+- ✅ `stubs.py` - 58% → 100% (+42 points)
+
+**Areas needing coverage:**
+- `parser.py` - Wire format parsing (47% → 70%)
+- `hooks.py` - Error cases in hook types (54% → 75%)
+- `client.py` - Error handling paths (60% → 80%)
+- `evaluator.py` - Legacy code paths (31% → 50%, low priority)
+
+**Implementation:**
+- [ ] Add tests for parser edge cases (malformed wire expressions)
+- [ ] Add tests for hook disposal and reference counting
+- [ ] Add tests for client error scenarios (network failures, timeouts)
+- [ ] Add tests for evaluator edge cases (deeply nested expressions)
+
+**Files:**
+- ✅ `tests/test_session.py` (31 tests added)
+- ✅ `tests/test_stubs.py` (26 tests added)
+- `tests/test_parser.py` (expand existing)
+- `tests/test_hooks_lifecycle.py` (new)
+- `tests/test_client_errors.py` (new)
+
+---
+
+### 2. Documentation & Examples (High Priority)
+**What's missing:**
+- User guide for getting started
+- API reference documentation
+- More realistic examples
+- Migration guide from TypeScript
+
+**Implementation:**
+- [ ] Set up Sphinx documentation
+- [ ] Write quickstart guide
+- [ ] Document all public APIs
+- [ ] Add chat application example (WebSocket + bidirectional)
+- [ ] Add microservices example (service-to-service RPC)
+- [ ] Write TypeScript → Python migration guide
+
+**Files to create:**
+- `docs/` directory with Sphinx setup
+- `examples/chat/` - Real-time chat using WebSocket
+- `examples/microservices/` - Service mesh example
+
+---
 
 ## Medium Priority
 
@@ -246,9 +304,18 @@ These can be done quickly for immediate value:
 | IL Execution | ✅ | ⚠️ Remap only | Low Priority |
 | Release + Refcount | ✅ | ✅ | Done |
 | Escaped Arrays | ✅ | ✅ | Done |
-| Test Coverage | ~90% | 74% | Ongoing |
+| Test Coverage | ~90% | 71% | 🔄 In Progress |
+| Code Quality | ✅ | ✅ | ✅ Done (v0.3.1) |
 
 **Overall Compliance: ~95%** (up from ~90%)
+
+**Code Quality Metrics:**
+- ✅ All linting checks passing (ruff + pyrefly)
+- ✅ Type checking passing
+- ✅ 236 tests passing (up from 179)
+- ✅ Cyclomatic complexity under control
+- ✅ No code smells (import violations, naming issues)
+- ✅ 71% test coverage (up from 67%, target 80%)
 
 ---
 

@@ -193,6 +193,69 @@ class PipelineBatch:
         """
         return self._client.call_pipelined(self, cap_id, method, args, property_path)
 
+    async def _ensure_transport(self) -> None:
+        """Ensure the transport is available and connected."""
+        if not self._client._transport:
+            self._client._transport = create_transport(
+                self._client.config.url, timeout=self._client.config.timeout
+            )
+            await self._client._transport.__aenter__()  # noqa: PLC2801
+
+    def _build_batch_messages(self) -> list[WireMessage]:
+        """Build the batch of push and pull messages.
+
+        Returns:
+            List of wire messages to send
+        """
+        messages: list[WireMessage] = []
+
+        # Add push messages for all pending calls
+        for call_or_expr in self._pending_calls.values():
+            if isinstance(call_or_expr, PendingCall):
+                pending_call = call_or_expr
+                # Build property path including method name
+                full_path = (pending_call.property_path or []) + [pending_call.method]
+                path_keys = [PropertyKey(p) for p in full_path]
+
+                # Create pipeline expression
+                pipeline_expr = WirePipeline(
+                    import_id=pending_call.cap_id,
+                    property_path=path_keys,
+                    args=pending_call.args,
+                )
+                messages.append(WirePush(pipeline_expr))
+
+            elif isinstance(call_or_expr, WirePipeline):
+                # Direct pipeline expression
+                messages.append(WirePush(call_or_expr))
+
+        # Add pull messages for all import IDs we need results for
+        messages.extend(WirePull(import_id.value) for import_id in self._pending_calls)
+
+        return messages
+
+    def _process_response_messages(self, response_messages: list[WireMessage]) -> None:
+        """Process response messages and store results.
+
+        Args:
+            response_messages: List of response messages from the server
+        """
+        for msg in response_messages:
+            if isinstance(msg, WireResolve):
+                # Export ID matches import ID (positive)
+                result_import_id = ImportId(msg.export_id)
+                if result_import_id in self._pending_calls:
+                    self._results[result_import_id] = msg.value
+
+            elif isinstance(msg, WireReject):
+                # Export ID matches import ID (positive)
+                result_import_id = ImportId(msg.export_id)
+                if result_import_id in self._pending_calls:
+                    # Parse error and store it as an exception
+                    error = self._client._parse_error(msg.error)
+                    # Store the error - will be raised when awaited
+                    self._results[result_import_id] = error
+
     async def _execute(self) -> None:
         """Execute all pending calls in a single batch.
 
@@ -206,44 +269,18 @@ class PipelineBatch:
             self._executed = True
 
             # Ensure transport is available
-            if not self._client._transport:
-                self._client._transport = create_transport(
-                    self._client.config.url, timeout=self._client.config.timeout
-                )
-                await self._client._transport.__aenter__()  # noqa: PLC2801
+            await self._ensure_transport()
 
             # Build batch of push and pull messages
-            messages: list[WireMessage] = []
-
-            # Add push messages for all pending calls
-            for call_or_expr in self._pending_calls.values():
-                if isinstance(call_or_expr, PendingCall):
-                    pending_call = call_or_expr
-                    # Build property path including method name
-                    full_path = (pending_call.property_path or []) + [
-                        pending_call.method
-                    ]
-                    path_keys = [PropertyKey(p) for p in full_path]
-
-                    # Create pipeline expression
-                    pipeline_expr = WirePipeline(
-                        import_id=pending_call.cap_id,
-                        property_path=path_keys,
-                        args=pending_call.args,
-                    )
-                    messages.append(WirePush(pipeline_expr))
-
-                elif isinstance(call_or_expr, WirePipeline):
-                    # Direct pipeline expression
-                    messages.append(WirePush(call_or_expr))
-
-            # Add pull messages for all import IDs we need results for
-            messages.extend(
-                WirePull(import_id.value) for import_id in self._pending_calls
-            )
+            messages = self._build_batch_messages()
 
             # Send the entire batch in one request
             batch = serialize_wire_batch(messages)
+
+            # Verify transport is available (should always be true after _ensure_transport)
+            if not self._client._transport:
+                msg = "Transport not available after initialization"
+                raise RpcError.internal(msg)
 
             try:
                 response_bytes = await self._client._transport.send_and_receive(
@@ -254,26 +291,9 @@ class PipelineBatch:
                 if not response_text:
                     return
 
-                # Parse responses
+                # Parse and process responses
                 response_messages = parse_wire_batch(response_text)
-
-                # Extract results from resolve messages
-
-                for msg in response_messages:
-                    if isinstance(msg, WireResolve):
-                        # Export ID matches import ID (positive)
-                        result_import_id = ImportId(msg.export_id)
-                        if result_import_id in self._pending_calls:
-                            self._results[result_import_id] = msg.value
-
-                    elif isinstance(msg, WireReject):
-                        # Export ID matches import ID (positive)
-                        result_import_id = ImportId(msg.export_id)
-                        if result_import_id in self._pending_calls:
-                            # Parse error and store it as an exception
-                            error = self._client._parse_error(msg.error)
-                            # Store the error - will be raised when awaited
-                            self._results[result_import_id] = error
+                self._process_response_messages(response_messages)
 
             except Exception as e:
                 # Store the error for all pending calls

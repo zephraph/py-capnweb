@@ -26,11 +26,12 @@ lint.extend-ignore = [
     "RET504", #  	[*] unnecessary-assign
     "PT012", #   	[ ] pytest-raises-with-multiple-statements
     "E501", #    	[ ] line-too-long
+    "FURB152", # 3.14 != Pi. This one is insane.
     #  Fix
     "CPY001", #  	[ ] missing-copyright-notice
     "SLF001", #  	[ ] private-member-access
     "PT011", #   	[ ] pytest-raises-too-broad
-    "C901", #    	[ ] complex-structure
+#    "C901", #    	[ ] complex-structure
     "BLE001", #  	[ ] blind-except
     "INP001", #  	[ ] implicit-namespace-package
     "ASYNC110", #	[ ] async-busy-wait

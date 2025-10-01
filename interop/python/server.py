@@ -65,104 +65,122 @@ class TestService(RpcTarget):
             3: User(3, "Charlie", "charlie@example.com"),
         }
 
-    async def call(self, method: str, args: list[Any]) -> Any:
-        match method:
-            case "echo":
-                # Simple echo - returns what it receives
-                return args[0] if args else None
+    async def _handle_echo(self, args: list[Any]) -> Any:
+        """Simple echo - returns what it receives."""
+        return args[0] if args else None
 
-            case "add":
-                # Basic arithmetic
-                return args[0] + args[1]
+    async def _handle_add(self, args: list[Any]) -> Any:
+        """Basic arithmetic - add two numbers."""
+        return args[0] + args[1]
 
-            case "multiply":
-                # Basic arithmetic
-                return args[0] * args[1]
+    async def _handle_multiply(self, args: list[Any]) -> Any:
+        """Basic arithmetic - multiply two numbers."""
+        return args[0] * args[1]
 
-            case "concat":
-                # String concatenation
-                return "".join(str(arg) for arg in args)
+    async def _handle_concat(self, args: list[Any]) -> Any:
+        """String concatenation."""
+        return "".join(str(arg) for arg in args)
 
-            case "getUser":
-                # Return a capability (User object)
-                user_id = args[0]
-                if user_id not in self.users:
-                    msg = f"User {user_id} not found"
-                    raise RpcError.not_found(msg)
-                return self.users[user_id]
+    async def _handle_get_user(self, args: list[Any]) -> Any:
+        """Return a capability (User object)."""
+        user_id = args[0]
+        if user_id not in self.users:
+            msg = f"User {user_id} not found"
+            raise RpcError.not_found(msg)
+        return self.users[user_id]
 
-            case "getUserName":
-                # Nested call: get user and return name
-                user_id = args[0]
-                if user_id not in self.users:
-                    msg = f"User {user_id} not found"
-                    raise RpcError.not_found(msg)
-                return self.users[user_id].name
+    async def _handle_get_user_name(self, args: list[Any]) -> Any:
+        """Nested call: get user and return name."""
+        user_id = args[0]
+        if user_id not in self.users:
+            msg = f"User {user_id} not found"
+            raise RpcError.not_found(msg)
+        return self.users[user_id].name
 
-            case "createUser":
-                # Create and return a new user
-                user_id = args[0]
-                name = args[1]
-                email = args[2]
-                user = User(user_id, name, email)
-                self.users[user_id] = user
-                return user
+    async def _handle_create_user(self, args: list[Any]) -> Any:
+        """Create and return a new user."""
+        user_id, name, email = args[0], args[1], args[2]
+        user = User(user_id, name, email)
+        self.users[user_id] = user
+        return user
 
-            case "getUserCount":
-                # Simple property access
-                return len(self.users)
+    async def _handle_get_user_count(self, args: list[Any]) -> Any:
+        """Simple property access - count users."""
+        return len(self.users)
 
-            case "getAllUserNames":
-                # Return array of names
-                return [user.name for user in self.users.values()]
+    async def _handle_get_all_user_names(self, args: list[Any]) -> Any:
+        """Return array of all user names."""
+        return [user.name for user in self.users.values()]
 
-            case "throwError":
-                # Test error handling
-                error_type = args[0] if args else "internal"
-                match error_type:
-                    case "not_found":
-                        msg = "Resource not found"
-                        raise RpcError.not_found(msg)
-                    case "bad_request":
-                        msg = "Invalid request"
-                        raise RpcError.bad_request(msg)
-                    case "permission_denied":
-                        msg = "Access denied"
-                        raise RpcError.permission_denied(msg)
-                    case _:
-                        msg = "Internal server error"
-                        raise RpcError.internal(msg)
-
-            case "processArray":
-                # Test array handling
-                arr = args[0]
-                return [x * 2 for x in arr]
-
-            case "processObject":
-                # Test object handling
-                obj = args[0]
-                return {
-                    "original": obj,
-                    "keys": list(obj.keys()),
-                    "count": len(obj),
-                }
-
-            case "asyncDelay":
-                # Test async behavior
-                delay = args[0] if args else 0.1
-                await asyncio.sleep(delay)
-                return f"Delayed {delay}s"
-
-            case "batchTest":
-                # Return data for batch testing
-                return {
-                    "timestamp": asyncio.get_event_loop().time(),
-                    "value": args[0] if args else 0,
-                }
-
-            case _:
-                msg = f"Method {method} not found"
+    async def _handle_throw_error(self, args: list[Any]) -> Any:
+        """Test error handling - throw specific error types."""
+        error_type = args[0] if args else "internal"
+        match error_type:
+            case "not_found":
+                msg = "Resource not found"
                 raise RpcError.not_found(msg)
+            case "bad_request":
+                msg = "Invalid request"
+                raise RpcError.bad_request(msg)
+            case "permission_denied":
+                msg = "Access denied"
+                raise RpcError.permission_denied(msg)
+            case _:
+                msg = "Internal server error"
+                raise RpcError.internal(msg)
+
+    async def _handle_process_array(self, args: list[Any]) -> Any:
+        """Test array handling - double each element."""
+        arr = args[0]
+        return [x * 2 for x in arr]
+
+    async def _handle_process_object(self, args: list[Any]) -> Any:
+        """Test object handling - return object metadata."""
+        obj = args[0]
+        return {
+            "original": obj,
+            "keys": list(obj.keys()),
+            "count": len(obj),
+        }
+
+    async def _handle_async_delay(self, args: list[Any]) -> Any:
+        """Test async behavior - delay and return."""
+        delay = args[0] if args else 0.1
+        await asyncio.sleep(delay)
+        return f"Delayed {delay}s"
+
+    async def _handle_batch_test(self, args: list[Any]) -> Any:
+        """Return data for batch testing."""
+        return {
+            "timestamp": asyncio.get_event_loop().time(),
+            "value": args[0] if args else 0,
+        }
+
+    async def call(self, method: str, args: list[Any]) -> Any:
+        # Dispatch table mapping method names to handlers
+        handlers = {
+            "echo": self._handle_echo,
+            "add": self._handle_add,
+            "multiply": self._handle_multiply,
+            "concat": self._handle_concat,
+            "getUser": self._handle_get_user,
+            "getUserName": self._handle_get_user_name,
+            "createUser": self._handle_create_user,
+            "getUserCount": self._handle_get_user_count,
+            "getAllUserNames": self._handle_get_all_user_names,
+            "throwError": self._handle_throw_error,
+            "processArray": self._handle_process_array,
+            "processObject": self._handle_process_object,
+            "asyncDelay": self._handle_async_delay,
+            "batchTest": self._handle_batch_test,
+        }
+
+        handler = handlers.get(method)
+        if not handler:
+            msg = f"Method {method} not found"
+            raise RpcError.not_found(msg)
+
+        return await handler(args)
 
     async def get_property(self, property: str) -> Any:
         match property:
