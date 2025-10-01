@@ -161,8 +161,8 @@ class TestPayloadDeepCopyTracking:
 
         # Should be a deep copy
         assert payload.value is not original
-        assert payload.value["users"] is not original["users"]
-        assert payload.value["users"][0] is not original["users"][0]
+        assert payload.value["users"] is not original["users"]  # type: ignore[index]
+        assert payload.value["users"][0] is not original["users"][0]  # type: ignore[index]
 
         # But values should be equal
         assert payload.value == original

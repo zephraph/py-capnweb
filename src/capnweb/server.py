@@ -269,20 +269,23 @@ class Server(RpcSession):
     async def _handle_push(
         self, expression: Any, import_id: int, imports: dict[int, StubHook]
     ) -> WireMessage | None:
-        """Handle a push message - evaluate expression and store result.
+        """Handle a push message - evaluate pipeline expression and store result.
 
         Args:
-            expression: The expression to evaluate (WirePipeline)
+            expression: The wire expression (expected to be WirePipeline)
             import_id: The import ID assigned sequentially for this push in the current batch
             imports: The batch-local import table
 
         The client's push messages are implicitly numbered sequentially (1, 2, 3...).
         The server tracks these in the import table so they can be pulled later.
+
+        Note: WirePipeline expressions are handled directly here, not through the Parser,
+        because they are a server-side execution construct, not a serialized data type.
         """
         try:
-            # Parse the pipeline expression
+            # Validate the pipeline expression
             if not isinstance(expression, WirePipeline):
-                msg = "Expected pipeline expression in push"
+                msg = "Expected WirePipeline expression in push"
                 raise RpcError.bad_request(msg)
 
             # Get the target hook (either from batch imports or our exports)
@@ -294,46 +297,52 @@ class Server(RpcSession):
                 msg = f"Capability {expression.import_id} not found"
                 raise RpcError.not_found(msg)
 
-            # Parse arguments
+            # Parse arguments using the session's parser
+            # This handles any ["export", id] references within the args
             args_payload = (
                 self.parser.parse(expression.args)
                 if expression.args is not None
                 else RpcPayload.owned([])
             )
 
-            # Extract the path - last element is the method, earlier are properties
-            path = [str(pk.value) for pk in (expression.property_path or [])]
+            # Extract the path (method and property names)
+            path: list[str | int] = [
+                str(pk.value) for pk in (expression.property_path or [])
+            ]
 
-            # Ensure target_hook is not None before calling
-            if target_hook is None:
-                msg = f"Target hook is None for import {expression.import_id}"
-                raise RpcError.not_found(msg)
-
-            # Call the target hook asynchronously
-            async def execute_call():
+            # Execute the call asynchronously
+            async def execute_call() -> StubHook:
+                """Execute the method call and return the result hook."""
                 try:
-                    result_hook = await target_hook.call(path, args_payload)  # type: ignore[union-attr]
+                    # target_hook is guaranteed non-None at this point due to check above
+                    assert target_hook is not None
+                    # Call through the hook chain
+                    result_hook = await target_hook.call(path, args_payload)
                     return result_hook
-                except Exception as e:
-                    if isinstance(e, RpcError):
-                        return ErrorStubHook(e)
-                    return ErrorStubHook(RpcError.internal(f"Call failed: {e}"))
 
-            # Create a future for the result and store it
+                except RpcError as e:
+                    # RPC errors become ErrorStubHook
+                    return ErrorStubHook(e)
+                except Exception as e:
+                    # Other errors become internal RPC errors
+                    logger = logging.getLogger(__name__)
+                    logger.exception("Call execution failed: %s", e)
+                    return ErrorStubHook(RpcError.internal(f"Target call failed: {e}"))
+
+            # Create a future for the result
             result_future: asyncio.Future[StubHook] = asyncio.create_task(
                 execute_call()
             )
 
-            # Store in batch imports using a PromiseStubHook
-
-            promise_hook = PromiseStubHook(result_future)
-            imports[import_id] = promise_hook
+            # Store the future in the batch imports as a PromiseStubHook
+            # so the client can pull it later
+            imports[import_id] = PromiseStubHook(result_future)
 
             # No immediate response - client will pull when ready
             return None
 
         except RpcError as e:
-            # If evaluation fails immediately, we should reject
+            # If setup fails immediately, we should reject
             stack = (
                 str(e.data)
                 if e.data
@@ -343,40 +352,47 @@ class Server(RpcSession):
             )
             data = e.data if isinstance(e.data, dict) else None
             error_expr = WireError(str(e.code.value), e.message, stack, data)
-            # Convert to export ID for the response
             return WireReject(-import_id, error_expr)
+
         except Exception as e:
             # Unexpected error - log it server-side but don't expose details to client
-
             logger = logging.getLogger(__name__)
             logger.exception("Unexpected error in push: %s", e)
 
             # Only include stack trace if configured (security)
             stack = traceback.format_exc() if self.config.include_stack_traces else None
             error_expr = WireError("internal", "Internal server error", stack)
-            # Convert to export ID for the response
             return WireReject(-import_id, error_expr)
 
     async def _handle_pull(
         self, import_id: int, imports: dict[int, StubHook]
     ) -> WireMessage | None:
-        """Handle a pull message - send resolution when ready."""
+        """Handle a pull message - resolve and send the result.
+
+        Args:
+            import_id: The import ID the client wants to pull
+            imports: The batch-local import table
+
+        Returns:
+            WireResolve with the serialized result, or WireReject on error
+        """
         try:
             # Get the hook from batch imports
             hook = imports.get(import_id)
 
             if hook is None:
-                msg = f"Import {import_id} not found"
+                msg = f"Import {import_id} not found in batch"
                 raise RpcError.not_found(msg)
 
-            # Pull the payload from the hook
+            # Pull the final payload from the hook
+            # This awaits the promise if it's a PromiseStubHook
             payload = await hook.pull()
 
-            # Serialize the value
-            serialized_value = self.serializer.serialize(payload.value)
+            # Serialize the payload using the session's serializer
+            # This will handle exporting any RpcStub/RpcPromise within the result
+            serialized_value = self.serializer.serialize_payload(payload)
 
-            # Export ID should match the import ID (positive)
-            # TypeScript reference implementation uses positive IDs
+            # Export ID matches the import ID in the response
             export_id = import_id
 
             # Send resolution
