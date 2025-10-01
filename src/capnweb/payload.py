@@ -1,12 +1,6 @@
-"""RPC payload management with explicit ownership semantics.
-
-This module provides the RpcPayload class which wraps data being sent over RPC
-and manages its lifecycle and ownership explicitly. This prevents bugs related
-to shared mutable state and ensures resources are properly released.
-"""
-
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
@@ -151,26 +145,24 @@ class RpcPayload:
             A deep copy with all RPC references tracked
         """
         # Import here to avoid circular dependency
-        from capnweb.stubs import RpcPromise, RpcStub
+        from capnweb.stubs import RpcPromise, RpcStub  # noqa: PLC0415
 
         # Handle RpcStub and RpcPromise specially - don't copy them,
         # but track them and duplicate their hooks
         match obj:
             case RpcStub():
                 # Create a duplicate (shares the hook, increments refcount)
-                from capnweb.stubs import RpcStub as StubClass
 
                 dup: StubHook = obj._hook.dup()  # type: ignore[assignment]
-                new_stub = StubClass(dup)
+                new_stub = RpcStub(dup)
                 self.stubs.append(new_stub)
                 return new_stub
 
             case RpcPromise():
                 # Create a duplicate (shares the hook, increments refcount)
-                from capnweb.stubs import RpcPromise as PromiseClass
 
                 dup: StubHook = obj._hook.dup()  # type: ignore[assignment]
-                new_promise = PromiseClass(dup)
+                new_promise = RpcPromise(dup)
                 # Note: parent and property tracking would happen at the container level
                 return new_promise
 
@@ -190,7 +182,6 @@ class RpcPayload:
 
             case _:
                 # For other types, try to copy using copy module
-                import copy
 
                 try:
                     return copy.deepcopy(obj)
@@ -208,7 +199,7 @@ class RpcPayload:
             parent: The parent container (for promise tracking)
             key: The key/index in parent (for promise tracking)
         """
-        from capnweb.stubs import RpcPromise, RpcStub
+        from capnweb.stubs import RpcPromise, RpcStub  # noqa: PLC0415
 
         match obj:
             case RpcStub():

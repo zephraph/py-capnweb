@@ -14,6 +14,7 @@ Instead of a monolithic evaluator, different hook types handle different scenari
 from __future__ import annotations
 
 import asyncio
+import inspect
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from dataclasses import dataclass
@@ -21,10 +22,10 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Self
 
+from capnweb.error import RpcError
 from capnweb.payload import RpcPayload
 
 if TYPE_CHECKING:
-    from capnweb.error import RpcError
     from capnweb.session import RpcSession
     from capnweb.types import RpcTarget
 
@@ -166,7 +167,6 @@ class PayloadStubHook(StubHook):
             args.ensure_deep_copied()
 
             # Check if target is async
-            import inspect
 
             if inspect.iscoroutinefunction(target):
                 # Handle async callables
@@ -179,8 +179,6 @@ class PayloadStubHook(StubHook):
                         )
                         return PayloadStubHook(RpcPayload.owned(result))
                     except Exception as e:
-                        from capnweb.error import RpcError
-
                         error = RpcError.internal(f"Call failed: {e}")
                         return ErrorStubHook(error)
 
@@ -196,12 +194,8 @@ class PayloadStubHook(StubHook):
                 )
                 return PayloadStubHook(RpcPayload.owned(result))
             except Exception as e:
-                from capnweb.error import RpcError
-
                 error = RpcError.internal(f"Call failed: {e}")
                 return ErrorStubHook(error)
-
-        from capnweb.error import RpcError
 
         error = RpcError.bad_request(f"Target at {path} is not callable")
         return ErrorStubHook(error)
@@ -219,8 +213,6 @@ class PayloadStubHook(StubHook):
             value = self._navigate(path)
             return PayloadStubHook(RpcPayload.owned(value))
         except (KeyError, IndexError, AttributeError) as e:
-            from capnweb.error import RpcError
-
             error = RpcError.not_found(f"Property {path} not found: {e}")
             return ErrorStubHook(error)
 
@@ -286,15 +278,12 @@ class TargetStubHook(StubHook):
         Returns:
             A new hook with the result
         """
-        from capnweb.payload import RpcPayload as RpcPayloadClass
 
         args.ensure_deep_copied()
 
         # The last element of path is the method name
         # Earlier elements are properties to navigate
         if not path:
-            from capnweb.error import RpcError
-
             error = RpcError.bad_request("Cannot call target without method name")
             return ErrorStubHook(error)
 
@@ -316,8 +305,6 @@ class TargetStubHook(StubHook):
                     current_obj = prop_value
                 current_target = current_obj
             except Exception as e:
-                from capnweb.error import RpcError
-
                 if isinstance(e, RpcError):
                     return ErrorStubHook(e)
                 error = RpcError.not_found(
@@ -336,8 +323,6 @@ class TargetStubHook(StubHook):
                 # Otherwise, try to call the method directly on the object
                 method = getattr(current_target, method_name)
                 if callable(method):
-                    import inspect
-
                     if inspect.iscoroutinefunction(method):
                         result = (
                             await method(*args.value)
@@ -351,17 +336,13 @@ class TargetStubHook(StubHook):
                             else method(args.value)
                         )
                 else:
-                    from capnweb.error import RpcError
-
                     error = RpcError.bad_request(
                         f"Method {method_name} is not callable"
                     )
                     return ErrorStubHook(error)
 
-            return PayloadStubHook(RpcPayloadClass.from_app_return(result))
+            return PayloadStubHook(RpcPayload.from_app_return(result))
         except Exception as e:
-            from capnweb.error import RpcError
-
             if isinstance(e, RpcError):
                 return ErrorStubHook(e)
             error = RpcError.internal(f"Target call failed: {e}")
@@ -376,7 +357,6 @@ class TargetStubHook(StubHook):
         Returns:
             A new hook with the property value
         """
-        from capnweb.payload import RpcPayload as RpcPayloadClass
 
         # For now, delegate to target.get_property for simple case
         if len(path) == 1:
@@ -384,10 +364,8 @@ class TargetStubHook(StubHook):
             async def get_property_async():
                 try:
                     result = await self.target.get_property(str(path[0]))
-                    return PayloadStubHook(RpcPayloadClass.from_app_return(result))
+                    return PayloadStubHook(RpcPayload.from_app_return(result))
                 except Exception as e:
-                    from capnweb.error import RpcError
-
                     if isinstance(e, RpcError):
                         return ErrorStubHook(e)
                     error = RpcError.internal(f"Property access failed: {e}")
@@ -399,8 +377,6 @@ class TargetStubHook(StubHook):
             )
             return PromiseStubHook(future)
 
-        from capnweb.error import RpcError
-
         error = RpcError.not_found(
             "Complex property paths not yet supported on targets"
         )
@@ -408,7 +384,6 @@ class TargetStubHook(StubHook):
 
     async def pull(self) -> RpcPayload:
         """Targets can't be pulled directly."""
-        from capnweb.error import RpcError
 
         msg = "Cannot pull a target object"
         raise RpcError.bad_request(msg)

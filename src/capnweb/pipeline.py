@@ -10,8 +10,20 @@ import asyncio
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from capnweb.error import RpcError
 from capnweb.ids import ImportId
-from capnweb.wire import PropertyKey, WirePipeline
+from capnweb.transports import create_transport
+from capnweb.wire import (
+    PropertyKey,
+    WireMessage,
+    WirePipeline,
+    WirePull,
+    WirePush,
+    WireReject,
+    WireResolve,
+    parse_wire_batch,
+    serialize_wire_batch,
+)
 
 if TYPE_CHECKING:
     from capnweb.client import Client
@@ -195,22 +207,12 @@ class PipelineBatch:
 
             # Ensure transport is available
             if not self._client._transport:
-                from capnweb.transports import create_transport
-
                 self._client._transport = create_transport(
                     self._client.config.url, timeout=self._client.config.timeout
                 )
                 await self._client._transport.__aenter__()  # noqa: PLC2801
 
             # Build batch of push and pull messages
-            from capnweb.wire import (
-                WireMessage,
-                WirePull,
-                WirePush,
-                parse_wire_batch,
-                serialize_wire_batch,
-            )
-
             messages: list[WireMessage] = []
 
             # Add push messages for all pending calls
@@ -256,7 +258,6 @@ class PipelineBatch:
                 response_messages = parse_wire_batch(response_text)
 
                 # Extract results from resolve messages
-                from capnweb.wire import WireReject, WireResolve
 
                 for msg in response_messages:
                     if isinstance(msg, WireResolve):
@@ -275,8 +276,6 @@ class PipelineBatch:
                             self._results[result_import_id] = error
 
             except Exception as e:
-                from capnweb.error import RpcError
-
                 # Store the error for all pending calls
                 error = RpcError.internal(f"Batch execution failed: {e}")
                 for import_id in self._pending_calls:

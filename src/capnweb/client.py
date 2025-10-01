@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -251,13 +253,10 @@ class Client(RpcSession):
         refcount = self._import_ref_counts.pop(import_id, 1)
 
         # Send release message (best-effort, non-blocking)
-        import asyncio
-
         async def send_release():
             if self._transport:
                 release_msg = WireRelease(import_id, refcount)
                 batch = serialize_wire_batch([release_msg])
-                from contextlib import suppress
 
                 with suppress(Exception):
                     await self._transport.send_and_receive(batch.encode("utf-8"))

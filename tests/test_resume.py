@@ -1,12 +1,16 @@
 """Tests for resume token functionality."""
 
 import time
+from typing import Any
 
 import pytest
 
 from capnweb.client import Client, ClientConfig
+from capnweb.error import RpcError
+from capnweb.ids import ExportId
 from capnweb.resume import ResumeToken, ResumeTokenManager
 from capnweb.server import Server, ServerConfig
+from capnweb.types import RpcTarget
 
 
 class TestResumeToken:
@@ -321,10 +325,6 @@ class TestResumeIntegration:
 
     async def test_session_restoration_with_capability(self) -> None:
         """Test session can be restored with a capability."""
-        from typing import Any
-
-        from capnweb.error import RpcError
-        from capnweb.types import RpcTarget
 
         class Counter(RpcTarget):
             def __init__(self) -> None:
@@ -369,16 +369,11 @@ class TestResumeIntegration:
         assert success
 
         # Verify capability was restored
-        from capnweb.ids import ExportId
 
         assert server._exports_typed.contains(ExportId(0))
 
     async def test_resume_token_with_multiple_capabilities(self) -> None:
         """Test resume token with multiple capabilities."""
-        from typing import Any
-
-        from capnweb.error import RpcError
-        from capnweb.types import RpcTarget
 
         class SimpleCapability(RpcTarget):
             def __init__(self, name: str) -> None:

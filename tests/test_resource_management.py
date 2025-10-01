@@ -6,7 +6,12 @@ import pytest
 
 from capnweb.client import Client, ClientConfig
 from capnweb.error import RpcError
-from capnweb.hooks import ErrorStubHook, PayloadStubHook, TargetStubHook
+from capnweb.hooks import (
+    ErrorStubHook,
+    PayloadStubHook,
+    PromiseStubHook,
+    TargetStubHook,
+)
 from capnweb.payload import RpcPayload
 from capnweb.server import Server, ServerConfig
 from capnweb.stubs import RpcPromise, RpcStub
@@ -212,7 +217,6 @@ class TestAsyncCallableSupport:
         result_hook = await hook.call(["greet"], RpcPayload.owned(["World"]))
 
         # Should return a PromiseStubHook
-        from capnweb.hooks import PromiseStubHook
 
         assert isinstance(result_hook, PromiseStubHook)
 

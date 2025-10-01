@@ -1,5 +1,7 @@
 """Tests for import and export ID management."""
 
+import threading
+
 from capnweb.ids import ExportId, IdAllocator, ImportId
 
 
@@ -110,7 +112,6 @@ class TestIdAllocator:
 
     def test_thread_safety(self) -> None:
         """Test thread-safe allocation."""
-        import threading
 
         allocator = IdAllocator()
         results: list[ImportId] = []

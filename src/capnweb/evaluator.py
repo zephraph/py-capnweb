@@ -7,10 +7,10 @@ resolving imports, exports, and performing RPC calls.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from capnweb.error import RpcError
+from capnweb.error import ErrorCode, RpcError
 from capnweb.ids import ExportId, ImportId
 from capnweb.types import RpcTarget
 from capnweb.wire import (
@@ -84,8 +84,6 @@ class ExpressionEvaluator:
             # Handle special forms
             case WireError():
                 # Return an RpcError instance
-                from capnweb.error import ErrorCode
-
                 return RpcError(
                     ErrorCode.INTERNAL,
                     expr.message,
@@ -94,8 +92,6 @@ class ExpressionEvaluator:
 
             case WireDate():
                 # Convert to Python datetime
-                from datetime import datetime
-
                 return datetime.fromtimestamp(expr.timestamp / 1000.0, tz=UTC)
 
             case WireImport():
@@ -468,8 +464,6 @@ class RemapExpressionEvaluator:
 
             # Handle other wire types using standard evaluator logic
             case WireError():
-                from capnweb.error import ErrorCode
-
                 return RpcError(
                     ErrorCode.INTERNAL,
                     expr.message,
@@ -477,8 +471,6 @@ class RemapExpressionEvaluator:
                 )
 
             case WireDate():
-                from datetime import datetime
-
                 return datetime.fromtimestamp(expr.timestamp / 1000.0, tz=UTC)
 
             case WirePipeline():

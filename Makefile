@@ -7,6 +7,7 @@ install:
 
 test:
 	pytest tests -v
+	cd interop && ./run_tests.sh
 
 test-cov:
 	pytest tests --cov=capnweb --cov-report=html --cov-report=term

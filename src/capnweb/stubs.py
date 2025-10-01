@@ -7,6 +7,7 @@ provide a natural, Proxy-like API.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Self
@@ -86,11 +87,9 @@ class RpcStub:
             result_hook = await self._hook.call([], args_payload)
             return result_hook
 
-        import asyncio
-
         future = asyncio.ensure_future(do_call())
 
-        from capnweb.hooks import PromiseStubHook
+        from capnweb.hooks import PromiseStubHook  # noqa: PLC0415
 
         return RpcPromise(PromiseStubHook(future))
 
@@ -182,11 +181,9 @@ class RpcPromise:
             result_hook = await self._hook.call([], args_payload)
             return result_hook
 
-        import asyncio
-
         future = asyncio.ensure_future(do_call())
 
-        from capnweb.hooks import PromiseStubHook
+        from capnweb.hooks import PromiseStubHook  # noqa: PLC0415
 
         return RpcPromise(PromiseStubHook(future))
 

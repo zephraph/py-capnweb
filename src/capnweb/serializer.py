@@ -9,14 +9,12 @@ wire expressions.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
+from capnweb.error import RpcError
 from capnweb.payload import RpcPayload
-from capnweb.wire import WireError, WireExport
-
-if TYPE_CHECKING:
-    from capnweb.error import RpcError
-    from capnweb.stubs import RpcPromise, RpcStub
+from capnweb.stubs import RpcPromise, RpcStub
+from capnweb.wire import WireError, WireExport, WirePromise
 
 
 class Exporter(Protocol):
@@ -66,8 +64,6 @@ class Serializer:
             A JSON-serializable wire expression
         """
         # Import here to avoid circular dependencies
-        from capnweb.error import RpcError
-        from capnweb.stubs import RpcPromise, RpcStub
 
         match value:
             case None | bool() | int() | float() | str():
@@ -87,7 +83,6 @@ class Serializer:
                 # Handle RPC promises - export them as promises
                 export_id = self.exporter.export_capability(value)
                 # Promises are exported with their promise ID
-                from capnweb.wire import WirePromise
 
                 return WirePromise(export_id).to_json()
 

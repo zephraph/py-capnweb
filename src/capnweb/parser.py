@@ -10,11 +10,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol
 
+from capnweb.error import ErrorCode, RpcError
 from capnweb.hooks import (
     ErrorStubHook,
 )
 from capnweb.payload import RpcPayload
-from capnweb.wire import WireError, WireExport, WirePromise
+from capnweb.stubs import RpcPromise, RpcStub
+from capnweb.wire import WireError, WireExport
+from capnweb.wire import WirePromise as WirePromiseType
 
 if TYPE_CHECKING:
     from capnweb.hooks import StubHook
@@ -125,8 +128,6 @@ class Parser:
                     # ["pipeline", import_id, [...path], args]
                     # This is handled by the session, not here
                     # For now, treat as error
-                    from capnweb.error import RpcError
-                    from capnweb.stubs import RpcStub
 
                     error = RpcError.bad_request(
                         "Pipeline expressions should not appear in parse input"
@@ -155,7 +156,6 @@ class Parser:
         Returns:
             An RpcStub wrapping an RpcImportHook
         """
-        from capnweb.stubs import RpcStub
 
         wire_export = WireExport.from_json(wire_expr)
         export_id = wire_export.export_id
@@ -178,8 +178,6 @@ class Parser:
         Returns:
             An error stub (imports shouldn't appear in received data)
         """
-        from capnweb.error import RpcError
-        from capnweb.stubs import RpcStub
 
         error = RpcError.bad_request(
             "Import expressions should not appear in parse input"
@@ -198,9 +196,8 @@ class Parser:
         Returns:
             An RpcPromise wrapping a PromiseStubHook
         """
-        from capnweb.stubs import RpcPromise
 
-        wire_promise = WirePromise.from_json(wire_expr)
+        wire_promise = WirePromiseType.from_json(wire_expr)
         promise_id = wire_promise.promise_id
 
         # Create a promise hook that will resolve when the promise settles
@@ -219,8 +216,6 @@ class Parser:
         Returns:
             An RpcStub wrapping an ErrorStubHook
         """
-        from capnweb.error import ErrorCode, RpcError
-        from capnweb.stubs import RpcStub
 
         wire_error = WireError.from_json(wire_expr)
 

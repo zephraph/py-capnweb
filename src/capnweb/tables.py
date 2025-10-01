@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from capnweb.error import RpcError
+from capnweb.ids import ExportId, ImportId
 
 if TYPE_CHECKING:
-    from capnweb.ids import ExportId, ImportId
     from capnweb.types import RpcTarget
 
 
@@ -91,7 +91,6 @@ class ImportTable:
         Args:
             snapshot: Dictionary mapping import_id -> (value, ref_count)
         """
-        from capnweb.ids import ImportId
 
         self._entries.clear()
         for import_id_val, (value, ref_count) in snapshot.items():
@@ -163,7 +162,6 @@ class ExportTable:
         Args:
             snapshot: Dictionary mapping export_id -> (target, ref_count)
         """
-        from capnweb.ids import ExportId
 
         self._entries.clear()
         for export_id_val, (target, ref_count) in snapshot.items():

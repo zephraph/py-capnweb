@@ -13,7 +13,7 @@ from aiohttp import web
 from typing_extensions import Self
 
 from capnweb.error import RpcError
-from capnweb.hooks import ErrorStubHook, StubHook
+from capnweb.hooks import ErrorStubHook, PromiseStubHook, StubHook
 from capnweb.ids import ImportId
 from capnweb.payload import RpcPayload
 from capnweb.resume import ResumeToken, ResumeTokenManager
@@ -315,11 +315,9 @@ class Server(RpcSession):
                     result_hook = await target_hook.call(path, args_payload)  # type: ignore[union-attr]
                     return result_hook
                 except Exception as e:
-                    from capnweb.error import RpcError as RpcErr
-
-                    if isinstance(e, RpcErr):
+                    if isinstance(e, RpcError):
                         return ErrorStubHook(e)
-                    return ErrorStubHook(RpcErr.internal(f"Call failed: {e}"))
+                    return ErrorStubHook(RpcError.internal(f"Call failed: {e}"))
 
             # Create a future for the result and store it
             result_future: asyncio.Future[StubHook] = asyncio.create_task(
@@ -327,7 +325,6 @@ class Server(RpcSession):
             )
 
             # Store in batch imports using a PromiseStubHook
-            from capnweb.hooks import PromiseStubHook
 
             promise_hook = PromiseStubHook(result_future)
             imports[import_id] = promise_hook
@@ -350,8 +347,6 @@ class Server(RpcSession):
             return WireReject(-import_id, error_expr)
         except Exception as e:
             # Unexpected error - log it server-side but don't expose details to client
-            import logging
-            import traceback
 
             logger = logging.getLogger(__name__)
             logger.error(f"Unexpected error in push: {e}", exc_info=True)

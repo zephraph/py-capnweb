@@ -7,6 +7,7 @@ import pytest
 
 from capnweb.client import Client, ClientConfig
 from capnweb.error import RpcError
+from capnweb.pipeline import PipelinePromise
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 
@@ -229,7 +230,6 @@ class TestPipelinePromise:
                 user_name = user.name
 
                 # These are PipelinePromise objects
-                from capnweb.pipeline import PipelinePromise
 
                 assert isinstance(user_id, PipelinePromise)
                 assert isinstance(user_name, PipelinePromise)
@@ -255,8 +255,6 @@ class TestPipelinePromise:
                 # This creates pipeline references but doesn't execute yet
                 prop1 = user.profile
                 prop2 = prop1.settings
-
-                from capnweb.pipeline import PipelinePromise
 
                 assert isinstance(prop2, PipelinePromise)
 
