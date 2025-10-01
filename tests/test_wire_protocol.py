@@ -127,8 +127,8 @@ class TestEscapedArrays:
         # An array starting with a string should be escaped when serialized
         literal_array = ["error", "not really an error"]
 
-        # When we serialize it, it should be wrapped
-        json_output = wire_expression_to_json(literal_array)
+        # When we serialize it WITH escaping enabled, it should be wrapped
+        json_output = wire_expression_to_json(literal_array, escape_arrays=True)
         assert json_output == [["error", "not really an error"]]
 
         # When we parse it back, it should unwrap
@@ -138,13 +138,13 @@ class TestEscapedArrays:
         assert not isinstance(parsed, WireError)
 
     def test_normal_array_not_escaped(self):
-        """Test that normal arrays are not escaped."""
+        """Test that normal arrays are not escaped by default."""
         normal_array = [1, 2, 3]
         json_output = wire_expression_to_json(normal_array)
         assert json_output == [1, 2, 3]
 
     def test_nested_arrays_with_strings(self):
-        """Test arrays with string elements that don't need escaping."""
+        """Test arrays with string elements that don't need escaping by default."""
         array = [123, "hello", 456]  # Doesn't start with string
         json_output = wire_expression_to_json(array)
         assert json_output == [123, "hello", 456]
@@ -154,8 +154,8 @@ class TestEscapedArrays:
         # Start with a literal array that looks like a special form
         original = ["import", 123, "foo"]
 
-        # Serialize
-        serialized = wire_expression_to_json(original)
+        # Serialize WITH escaping enabled
+        serialized = wire_expression_to_json(original, escape_arrays=True)
         assert serialized == [["import", 123, "foo"]]
 
         # Deserialize

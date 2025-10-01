@@ -260,15 +260,14 @@ class PipelineBatch:
 
                 for msg in response_messages:
                     if isinstance(msg, WireResolve):
-                        # Convert export ID back to import ID
-                        # Export IDs are negative of import IDs
-                        result_import_id = ImportId(-msg.export_id)
+                        # Export ID matches import ID (positive)
+                        result_import_id = ImportId(msg.export_id)
                         if result_import_id in self._pending_calls:
                             self._results[result_import_id] = msg.value
 
                     elif isinstance(msg, WireReject):
-                        # Store error for this import ID
-                        result_import_id = ImportId(-msg.export_id)
+                        # Export ID matches import ID (positive)
+                        result_import_id = ImportId(msg.export_id)
                         if result_import_id in self._pending_calls:
                             # Parse error and store it as an exception
                             error = self._client._parse_error(msg.error)

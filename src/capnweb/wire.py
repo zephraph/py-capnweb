@@ -283,17 +283,27 @@ def wire_expression_from_json(value: Any) -> WireExpression:
 
         # Check for escaped literal arrays: [[...]]
         # If the array has exactly one element and that element is also an array,
-        # it's likely an escaped literal (unless it's a special form)
+        # it's likely an escaped literal (unless it's a VALID special form)
         if len(value) == 1 and isinstance(value[0], list):
             inner = value[0]
-            # Check if the inner array is a special form (starts with a string keyword)
-            if (
-                inner
-                and isinstance(inner[0], str)
-                and inner[0]
-                in {"error", "import", "export", "promise", "pipeline", "date", "remap"}
-            ):
-                # This is a special form, not an escaped array
+            # Check if the inner array is a VALID special form
+            # Not just starts with a keyword, but has correct structure
+            is_valid_special_form = False
+            if inner and isinstance(inner[0], str):
+                tag = inner[0]
+                if tag == "error" and len(inner) >= 3:
+                    is_valid_special_form = True
+                elif tag in {"import", "export", "promise"} and len(inner) == 2:
+                    is_valid_special_form = True
+                elif tag == "pipeline" and len(inner) >= 2:
+                    is_valid_special_form = True
+                elif tag == "date" and len(inner) == 2:
+                    is_valid_special_form = True
+                elif tag == "remap" and len(inner) == 5:
+                    is_valid_special_form = True
+
+            if is_valid_special_form:
+                # This is a valid special form, parse it
                 return wire_expression_from_json(inner)
             # This is an escaped literal array, unwrap it
             return [wire_expression_from_json(item) for item in inner]
@@ -327,26 +337,25 @@ def wire_expression_from_json(value: Any) -> WireExpression:
     raise ValueError(msg)
 
 
-def wire_expression_to_json(expr: WireExpression, escape_arrays: bool = True) -> Any:
+def wire_expression_to_json(expr: WireExpression, escape_arrays: bool = False) -> Any:
     """Convert a wire expression to JSON.
 
     Args:
         expr: The expression to convert
-        escape_arrays: Whether to escape arrays that start with strings (for top-level messages).
-                       Set to False when serializing arguments within expressions.
+        escape_arrays: Whether to escape literal arrays by wrapping them (for pipeline arguments).
+                       Set to True only for pipeline argument values to match TypeScript behavior.
     """
     match expr:
         case None | bool() | int() | float() | str():
             return expr
 
         case dict():
-            return {
-                k: wire_expression_to_json(v, escape_arrays) for k, v in expr.items()
-            }
+            # Propagate escape_arrays flag to dict values (for arrays nested in objects)
+            return {k: wire_expression_to_json(v, escape_arrays) for k, v in expr.items()}
 
         case list():
-            # Recursively serialize list items
-            serialized = [wire_expression_to_json(item, escape_arrays) for item in expr]
+            # Recursively serialize list items (don't propagate escaping to nested items)
+            serialized = [wire_expression_to_json(item, False) for item in expr]
             # Escape arrays when needed based on context
             if escape_arrays and serialized:
                 # In TypeScript wire protocol, literal arrays must be escaped with extra wrapping
@@ -404,7 +413,10 @@ class WireResolve:
 
     def to_json(self) -> list[Any]:
         """Convert to JSON array."""
-        return ["resolve", self.export_id, wire_expression_to_json(self.value)]
+        # Arrays in resolve values must be escaped with [[...]] to match TypeScript behavior
+        # This includes both top-level arrays and arrays nested in objects
+        serialized_value = wire_expression_to_json(self.value, escape_arrays=True)
+        return ["resolve", self.export_id, serialized_value]
 
 
 @dataclass(frozen=True)
