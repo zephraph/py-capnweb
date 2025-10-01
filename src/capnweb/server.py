@@ -380,15 +380,16 @@ class Server(RpcSession):
             # Serialize the value
             serialized_value = self.serializer.serialize(payload.value)
 
-            # Convert import ID to export ID for the response (negate)
-            export_id = -import_id
+            # Export ID should match the import ID (positive)
+            # TypeScript reference implementation uses positive IDs
+            export_id = import_id
 
             # Send resolution
             return WireResolve(export_id, serialized_value)
 
         except RpcError as e:
             # Send rejection
-            export_id = -import_id
+            export_id = import_id
             stack = (
                 str(e.data)
                 if e.data
@@ -404,7 +405,7 @@ class Server(RpcSession):
             logger = logging.getLogger(__name__)
             logger.error(f"Unexpected error in pull: {e}", exc_info=True)
 
-            export_id = -import_id
+            export_id = import_id
             stack = traceback.format_exc() if self.config.include_stack_traces else None
             error_expr = WireError("internal", "Internal server error", stack)
             return WireReject(export_id, error_expr)

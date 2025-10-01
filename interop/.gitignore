@@ -1,0 +1,16 @@
+# Node modules
+typescript/node_modules/
+typescript/dist/
+typescript/package-lock.json
+
+# Logs
+*.log
+/tmp/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so

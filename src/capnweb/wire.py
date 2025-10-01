@@ -148,7 +148,16 @@ class WirePipeline:
         else:
             result.append(None)
         if self.args is not None:
-            result.append(wire_expression_to_json(self.args))
+            # Args: the args array itself shouldn't be escaped, but values within should be
+            # TypeScript requires literal arrays as values to be escaped
+            if isinstance(self.args, list):
+                # Process each argument value with escaping enabled
+                result.append([
+                    wire_expression_to_json(arg, escape_arrays=True)
+                    for arg in self.args
+                ])
+            else:
+                result.append(wire_expression_to_json(self.args, escape_arrays=True))
         return result
 
     @staticmethod
@@ -274,15 +283,20 @@ def wire_expression_from_json(value: Any) -> WireExpression:
 
         # Check for escaped literal arrays: [[...]]
         # If the array has exactly one element and that element is also an array,
-        # and the inner array starts with a string, it's an escaped literal
-        if (
-            len(value) == 1
-            and isinstance(value[0], list)
-            and value[0]
-            and isinstance(value[0][0], str)
-        ):
+        # it's likely an escaped literal (unless it's a special form)
+        if len(value) == 1 and isinstance(value[0], list):
+            inner = value[0]
+            # Check if the inner array is a special form (starts with a string keyword)
+            if (
+                inner
+                and isinstance(inner[0], str)
+                and inner[0]
+                in {"error", "import", "export", "promise", "pipeline", "date", "remap"}
+            ):
+                # This is a special form, not an escaped array
+                return wire_expression_from_json(inner)
             # This is an escaped literal array, unwrap it
-            return [wire_expression_from_json(item) for item in value[0]]
+            return [wire_expression_from_json(item) for item in inner]
 
         # Check for special forms (arrays starting with a string)
         if isinstance(value[0], str):
@@ -313,21 +327,30 @@ def wire_expression_from_json(value: Any) -> WireExpression:
     raise ValueError(msg)
 
 
-def wire_expression_to_json(expr: WireExpression) -> Any:
-    """Convert a wire expression to JSON."""
+def wire_expression_to_json(expr: WireExpression, escape_arrays: bool = True) -> Any:
+    """Convert a wire expression to JSON.
+
+    Args:
+        expr: The expression to convert
+        escape_arrays: Whether to escape arrays that start with strings (for top-level messages).
+                       Set to False when serializing arguments within expressions.
+    """
     match expr:
         case None | bool() | int() | float() | str():
             return expr
 
         case dict():
-            return {k: wire_expression_to_json(v) for k, v in expr.items()}
+            return {
+                k: wire_expression_to_json(v, escape_arrays) for k, v in expr.items()
+            }
 
         case list():
-            # Check if this is a literal array that needs escaping
-            # (starts with a string that could be confused with a special form)
-            serialized = [wire_expression_to_json(item) for item in expr]
-            if serialized and isinstance(serialized[0], str):
-                # Wrap in an extra array to escape it
+            # Recursively serialize list items
+            serialized = [wire_expression_to_json(item, escape_arrays) for item in expr]
+            # Escape arrays when needed based on context
+            if escape_arrays and serialized:
+                # In TypeScript wire protocol, literal arrays must be escaped with extra wrapping
+                # to distinguish them from protocol expressions
                 return [serialized]
             return serialized
 

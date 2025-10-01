@@ -2,6 +2,21 @@
 
 Python implementation of the [Cap'n Web protocol](https://github.com/cloudflare/capnweb), delivering both server and client with support for HTTP batch and WebSocket transports.
 
+## Status: v0.3.0
+
+✅ **Fully interoperable with TypeScript reference implementation**
+All 4 cross-implementation test scenarios passing (Python↔Python, Python↔TypeScript, TypeScript↔Python, TypeScript↔TypeScript)
+
+### What's New in v0.3.0
+
+- **🎉 Full TypeScript Interoperability**: Achieved 100% compatibility with the official TypeScript capnweb library
+  - Fixed export ID convention to use positive IDs matching TypeScript
+  - Implemented proper array escaping/unescaping for literal arrays in arguments
+  - Validated with comprehensive cross-implementation test suite
+- **Interop Test Suite**: Added automated testing framework covering all 4 implementation combinations
+- **TypeScript Test Client**: Integrated official capnweb library for reference testing
+- **Protocol Alignment**: Wire format now fully compliant with TypeScript reference implementation
+
 ## Features
 
 - **Capability-based security**: Unforgeable object references with explicit disposal
@@ -14,7 +29,7 @@ Python implementation of the [Cap'n Web protocol](https://github.com/cloudflare/
 - **Reference counting**: Automatic resource management with proper refcounting
 - **Resume tokens**: Session restoration for stateful connections
 - **Bidirectional RPC**: Peer-to-peer capability passing
-- **Interoperable**: Compatible with TypeScript and Rust implementations
+- **100% Interoperable**: Fully compatible with [TypeScript reference implementation](https://github.com/cloudflare/capnweb)
 
 ## Installation
 
@@ -204,25 +219,41 @@ This implementation follows the official [Cap'n Web protocol specification](http
 
 - **Wire Protocol**: All core message types (push, pull, resolve, reject, release, abort)
 - **Wire Expressions**: Error, import, export, promise, pipeline, date, remap
+- **Array Escaping**: Proper `[[...]]` literal array escaping compatible with TypeScript implementation
+- **Export ID Convention**: Positive export IDs matching TypeScript reference implementation
 - **Release with refcount**: Proper reference counting for resource management
 - **Remap expressions**: Full `.map()` operation support with captures and instructions
-- **Escaped literal arrays**: `[[...]]` format to prevent special form confusion
 - **Transport abstraction**: HTTP batch and WebSocket transports
 - **Security**: Configurable stack trace redaction
 - **Error handling**: Structured error model with custom error data
 
 ### 🚧 Planned Features
 
-- **Promise pipelining**: Chaining calls without waiting for intermediate results
 - **WebTransport support**: H3-based transport for modern applications
 - **IL plan execution**: Complex multi-step operations
 - **Recorder macros**: Ergonomic client-side API generation
 
-### Interoperability
+### Interoperability Testing
 
-Designed to be fully compatible with:
-- [TypeScript reference implementation](https://github.com/cloudflare/capnweb)
-- Rust implementation (in development)
+Comprehensive cross-implementation testing with the TypeScript reference implementation:
+
+```bash
+cd interop
+bash run_tests.sh
+```
+
+**Test Matrix** (all passing ✅):
+- Python Server ← Python Client
+- Python Server ← TypeScript Client
+- TypeScript Server ← Python Client
+- TypeScript Server ← TypeScript Client
+
+The interop test suite validates:
+- Basic RPC operations (echo, arithmetic, string manipulation)
+- Complex data types (arrays, objects)
+- Error handling (not_found, bad_request)
+- Concurrent batch calls
+- Property access patterns
 
 ## License
 

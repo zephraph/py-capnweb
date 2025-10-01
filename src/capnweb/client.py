@@ -147,11 +147,13 @@ class Client(RpcSession):
             result = None
             error = None
             for msg in messages:
-                if isinstance(msg, WireResolve) and msg.export_id == -import_id:
+                # Match either positive or negative export_id
+                # Different implementations may use different conventions
+                if isinstance(msg, WireResolve) and abs(msg.export_id) == import_id:
                     # Parse the result using the new parser
                     result_payload = self.parser.parse(msg.value)
                     result = result_payload.value
-                elif isinstance(msg, WireReject) and msg.export_id == -import_id:
+                elif isinstance(msg, WireReject) and abs(msg.export_id) == import_id:
                     error = self._parse_error(msg.error)
 
             if error:
@@ -196,11 +198,14 @@ class Client(RpcSession):
     def _parse_error(self, error_expr: Any) -> RpcError:
         """Parse an error expression into an RpcError."""
         if isinstance(error_expr, WireError):
-            return RpcError(
-                ErrorCode(error_expr.error_type.lower().replace(" ", "_")),
-                error_expr.message,
-                error_expr.stack,
-            )
+            # Try to map error type to ErrorCode, default to INTERNAL if unknown
+            error_type = error_expr.error_type.lower().replace(" ", "_")
+            try:
+                code = ErrorCode(error_type)
+            except ValueError:
+                # Unknown error code, use INTERNAL
+                code = ErrorCode.INTERNAL
+            return RpcError(code, error_expr.message, error_expr.stack)
         return RpcError.internal(f"Unknown error: {error_expr}")
 
     async def _handle_reject(self, export_id: ExportId, error_expr: Any) -> None:
