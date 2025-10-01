@@ -234,7 +234,7 @@ class Client(RpcSession):
             error = RpcError.internal(f"Server aborted: {error_expr}")
 
         # Reject all pending promises
-        for promise_id, future in list(self._pending_promises.items()):
+        for _promise_id, future in list(self._pending_promises.items()):
             if not future.done():
                 future.set_exception(error)
 

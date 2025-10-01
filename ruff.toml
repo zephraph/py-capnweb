@@ -38,7 +38,7 @@ lint.extend-ignore = [
     "N802", #    	[ ] invalid-function-name
     "PT012", #   	[ ] pytest-raises-with-multiple-statements
     "RET504", #  	[*] unnecessary-assign
-    "B007", #   	[*] unused-loop-control-variable
-    "B024", #   	[ ] abstract-base-class-without-abstract-method
-    "B027", #   	[ ] empty-method-without-abstract-decorator
+#    "B007", #   	[*] unused-loop-control-variable
+#    "B024", #   	[ ] abstract-base-class-without-abstract-method
+#    "B027", #   	[ ] empty-method-without-abstract-decorator
 ]
