@@ -1,6 +1,6 @@
 [project]
 name = "py-capnweb"
-version = "0.3.0"
+version = "0.3.1"
 description = "Python implementation of the Cap'n Web protocol"
 readme = "README.md"
 requires-python = ">=3.11"
