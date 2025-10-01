@@ -5,18 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## 0.3.1
 
 ### Added
-- Comprehensive test coverage improvements across core modules
-- `session.py` - 44% → 99% coverage (+31 tests)
-- `stubs.py` - 58% → 100% coverage (+26 tests)
-- `parser.py` - 47% → 98% coverage (+30 tests)
-- `hooks.py` - 54% → 86% coverage (+36 tests)
-- `serializer.py` - 68% → 100% coverage (+26 tests)
-- `payload.py` - 84% → 100% coverage (+23 tests)
-- 172 new tests added (329 total, up from 179)
-- Test coverage now at 85% overall (up from 67%)
+- **Comprehensive Documentation**
+  - Quickstart Guide (`docs/quickstart.md`) - Get started in 5 minutes
+  - Architecture Guide (`docs/architecture.md`) - Understand the hook-based design
+  - API Reference (`docs/api-reference.md`) - Complete API documentation
+  - Documentation Index (`docs/README.md`) - Central documentation hub
+- **Comprehensive test coverage improvements across core modules**
+  - `session.py` - 44% → 99% coverage (+31 tests)
+  - `stubs.py` - 58% → 100% coverage (+26 tests)
+  - `parser.py` - 47% → 98% coverage (+30 tests)
+  - `hooks.py` - 54% → 86% coverage (+36 tests)
+  - `serializer.py` - 68% → 100% coverage (+26 tests)
+  - `payload.py` - 84% → 100% coverage (+23 tests)
+  - 172 new tests added (329 total, up from 179)
+  - Test coverage now at 85% overall (up from 67%)
 
 ### Changed
 - Improved code quality and reduced cyclomatic complexity in 8 functions

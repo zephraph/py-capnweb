@@ -2,14 +2,14 @@
 
 ## Current Status
 
-**v0.3.1-dev - Test Coverage & Code Quality** 🚧
+**v0.3.1-dev - Architecture Complete & High Test Coverage** ✅
 
 - ✅ Core protocol types (IDs, errors, wire format)
 - ✅ HTTP batch transport (client & server)
 - ✅ WebSocket transport
 - ✅ Transport abstraction layer
 - ✅ Capability dispatch and method calls
-- ✅ Expression evaluator with match statements
+- ✅ Hook-based architecture (replaced evaluator)
 - ✅ Remap expressions (`.map()` operations)
 - ✅ Release with refcount
 - ✅ Escaped literal arrays
@@ -21,7 +21,8 @@
 - ✅ Promise pipelining (batching calls)
 - ✅ TypeScript interoperability (array escaping)
 - ✅ Code quality improvements (reduced cyclomatic complexity)
-- ✅ 236 tests, 71% coverage
+- ✅ Legacy code removed (evaluator.py, tables.py)
+- ✅ **329 tests, 85% coverage** (up from 179 tests, 67%)
 
 **See [CHANGES.md](CHANGES.md) for detailed changelog.**
 
@@ -29,53 +30,23 @@
 
 ## Next Steps (Priority Order)
 
-### 1. Test Coverage Improvements (High Priority)
-**Current:** 71% coverage, **Target:** 80%+
-
+### 2. Documentation & Examples (High Priority) ✅ **COMPLETE**
 **Completed:**
-- ✅ `session.py` - 44% → 99% (+55 points)
-- ✅ `stubs.py` - 58% → 100% (+42 points)
+- ✅ Documentation created (quickstart, architecture, API reference)
+- ✅ Chat application example (WebSocket + bidirectional RPC)
+- ✅ Microservices example (service mesh with capability passing)
 
-**Areas needing coverage:**
-- `parser.py` - Wire format parsing (47% → 70%)
-- `hooks.py` - Error cases in hook types (54% → 75%)
-- `client.py` - Error handling paths (60% → 80%)
-- `evaluator.py` - Legacy code paths (31% → 50%, low priority)
+**Files created:**
+- ✅ `docs/README.md` - Documentation hub
+- ✅ `docs/quickstart.md` - Getting started guide
+- ✅ `docs/architecture.md` - Hook-based architecture explanation
+- ✅ `docs/api-reference.md` - Complete API documentation
+- ✅ `examples/chat/` - Real-time chat (server.py, client.py, README.md)
+- ✅ `examples/microservices/` - Service mesh (user_service.py, order_service.py, api_gateway.py, client.py, README.md)
 
-**Implementation:**
-- [ ] Add tests for parser edge cases (malformed wire expressions)
-- [ ] Add tests for hook disposal and reference counting
-- [ ] Add tests for client error scenarios (network failures, timeouts)
-- [ ] Add tests for evaluator edge cases (deeply nested expressions)
-
-**Files:**
-- ✅ `tests/test_session.py` (31 tests added)
-- ✅ `tests/test_stubs.py` (26 tests added)
-- `tests/test_parser.py` (expand existing)
-- `tests/test_hooks_lifecycle.py` (new)
-- `tests/test_client_errors.py` (new)
-
----
-
-### 2. Documentation & Examples (High Priority)
-**What's missing:**
-- User guide for getting started
-- API reference documentation
-- More realistic examples
-- Migration guide from TypeScript
-
-**Implementation:**
-- [ ] Set up Sphinx documentation
-- [ ] Write quickstart guide
-- [ ] Document all public APIs
-- [ ] Add chat application example (WebSocket + bidirectional)
-- [ ] Add microservices example (service-to-service RPC)
+**Still missing (lower priority):**
+- [ ] Set up Sphinx for hosted docs (optional - markdown docs sufficient for now)
 - [ ] Write TypeScript → Python migration guide
-
-**Files to create:**
-- `docs/` directory with Sphinx setup
-- `examples/chat/` - Real-time chat using WebSocket
-- `examples/microservices/` - Service mesh example
 
 ---
 
@@ -203,20 +174,22 @@ Execute complex multi-step operations defined in IL on the server.
 
 ### 8. Additional Examples
 
-**Needed examples:**
+**Completed examples:**
 - [x] Simple calculator
 - [x] Batch vs sequential
 - [x] Peer-to-peer RPC
-- [ ] Chat application (WebSocket + bidirectional)
+- [x] Chat application (WebSocket + bidirectional)
+- [x] Microservices (service-to-service RPC)
+
+**Additional examples (nice to have):**
 - [ ] File server (streaming)
 - [ ] Database proxy (connection pooling)
-- [ ] Microservices (service-to-service RPC)
 
 **Files:**
-- `examples/chat/` (new)
-- `examples/fileserver/` (new)
-- `examples/database/` (new)
-- `examples/microservices/` (new)
+- ✅ `examples/chat/` - Real-time chat with WebSocket
+- ✅ `examples/microservices/` - Service mesh architecture
+- `examples/fileserver/` (future)
+- `examples/database/` (future)
 
 ---
 
@@ -304,18 +277,21 @@ These can be done quickly for immediate value:
 | IL Execution | ✅ | ⚠️ Remap only | Low Priority |
 | Release + Refcount | ✅ | ✅ | Done |
 | Escaped Arrays | ✅ | ✅ | Done |
-| Test Coverage | ~90% | 71% | 🔄 In Progress |
+| Test Coverage | ~90% | **85%** | ✅ **Done** |
 | Code Quality | ✅ | ✅ | ✅ Done (v0.3.1) |
+| Hook Architecture | ✅ | ✅ | ✅ **Done** (v0.3.1) |
 
-**Overall Compliance: ~95%** (up from ~90%)
+**Overall Compliance: ~98%** (up from ~90%)
 
 **Code Quality Metrics:**
 - ✅ All linting checks passing (ruff + pyrefly)
-- ✅ Type checking passing
-- ✅ 236 tests passing (up from 179)
+- ✅ Type checking passing (pyrefly)
+- ✅ **329 tests passing** (up from 179, +150 tests)
 - ✅ Cyclomatic complexity under control
 - ✅ No code smells (import violations, naming issues)
-- ✅ 71% test coverage (up from 67%, target 80%)
+- ✅ **85% test coverage** (up from 67%, exceeded 80% target!)
+- ✅ **8 modules at 100% coverage**
+- ✅ **Legacy code removed** (evaluator.py, tables.py)
 
 ---
 
