@@ -8,7 +8,6 @@ and Server extend this class to get unified capability management.
 from __future__ import annotations
 
 import asyncio
-from abc import ABC
 from typing import TYPE_CHECKING, Any
 
 from capnweb.hooks import (
@@ -25,7 +24,7 @@ if TYPE_CHECKING:
     from capnweb.types import RpcTarget
 
 
-class RpcSession(ABC):
+class RpcSession:
     """Base class for RPC sessions (Client and Server).
 
     This class manages the import and export tables, and implements both
