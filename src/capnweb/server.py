@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import traceback
+from collections import UserDict
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -98,7 +99,7 @@ class Server(RpcSession):
         # Get the parent's _exports dict
         parent_exports = self.__dict__.get("_exports", {})
 
-        class ExportsWrapper(dict):
+        class ExportsWrapper(UserDict):
             """Wrapper that acts like both a dict and ExportTable."""
 
             def contains(self, export_id):
@@ -232,7 +233,8 @@ class Server(RpcSession):
         try:
             # Parse the pipeline expression
             if not isinstance(expression, WirePipeline):
-                raise RpcError.bad_request("Expected pipeline expression in push")
+                msg = "Expected pipeline expression in push"
+                raise RpcError.bad_request(msg)
 
             # Get the target hook (either from batch imports or our exports)
             target_hook = imports.get(expression.import_id)
@@ -240,7 +242,8 @@ class Server(RpcSession):
                 target_hook = self.get_export_hook(expression.import_id)
 
             if target_hook is None:
-                raise RpcError.not_found(f"Capability {expression.import_id} not found")
+                msg = f"Capability {expression.import_id} not found"
+                raise RpcError.not_found(msg)
 
             # Parse arguments
             args_payload = (
@@ -254,9 +257,8 @@ class Server(RpcSession):
 
             # Ensure target_hook is not None before calling
             if target_hook is None:
-                raise RpcError.not_found(
-                    f"Target hook is None for import {expression.import_id}"
-                )
+                msg = f"Target hook is None for import {expression.import_id}"
+                raise RpcError.not_found(msg)
 
             # Call the target hook asynchronously
             async def execute_call():
@@ -320,7 +322,8 @@ class Server(RpcSession):
             hook = imports.get(import_id)
 
             if hook is None:
-                raise RpcError.not_found(f"Import {import_id} not found")
+                msg = f"Import {import_id} not found"
+                raise RpcError.not_found(msg)
 
             # Pull the payload from the hook
             payload = await hook.pull()
@@ -448,9 +451,8 @@ class Server(RpcSession):
 
         Not used in HTTP batch mode - raises NotImplementedError.
         """
-        raise NotImplementedError(
-            "Pipelining from server not supported in HTTP batch mode"
-        )
+        msg = "Pipelining from server not supported in HTTP batch mode"
+        raise NotImplementedError(msg)
 
     def send_pipeline_get(
         self,
@@ -462,13 +464,13 @@ class Server(RpcSession):
 
         Not used in HTTP batch mode - raises NotImplementedError.
         """
-        raise NotImplementedError(
-            "Pipelining from server not supported in HTTP batch mode"
-        )
+        msg = "Pipelining from server not supported in HTTP batch mode"
+        raise NotImplementedError(msg)
 
     async def pull_import(self, import_id: int) -> RpcPayload:
         """Pull the value from a remote capability.
 
         Not used in HTTP batch mode - raises NotImplementedError.
         """
-        raise NotImplementedError("Pull from server not supported in HTTP batch mode")
+        msg = "Pull from server not supported in HTTP batch mode"
+        raise NotImplementedError(msg)

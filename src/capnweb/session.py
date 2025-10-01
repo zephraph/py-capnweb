@@ -267,7 +267,8 @@ class RpcSession(ABC):
             args: Arguments for the call
             result_import_id: Import ID for the result
         """
-        raise NotImplementedError("Subclasses must implement send_pipeline_call")
+        msg = "Subclasses must implement send_pipeline_call"
+        raise NotImplementedError(msg)
 
     def send_pipeline_get(
         self,
@@ -285,7 +286,8 @@ class RpcSession(ABC):
             path: Property path
             result_import_id: Import ID for the result
         """
-        raise NotImplementedError("Subclasses must implement send_pipeline_get")
+        msg = "Subclasses must implement send_pipeline_get"
+        raise NotImplementedError(msg)
 
     async def pull_import(self, import_id: int) -> Any:
         """Pull the value from a remote capability.
@@ -298,7 +300,8 @@ class RpcSession(ABC):
         Returns:
             The pulled value
         """
-        raise NotImplementedError("Subclasses must implement pull_import")
+        msg = "Subclasses must implement pull_import"
+        raise NotImplementedError(msg)
 
     def get_export_hook(self, export_id: int) -> StubHook | None:
         """Get the hook for an exported capability.

@@ -17,9 +17,10 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from capnweb.payload import RpcPayload
+
 if TYPE_CHECKING:
     from capnweb.error import RpcError
-    from capnweb.payload import RpcPayload
     from capnweb.session import RpcSession
     from capnweb.types import RpcTarget
 
@@ -344,7 +345,8 @@ class TargetStubHook(StubHook):
         """Targets can't be pulled directly."""
         from capnweb.error import RpcError
 
-        raise RpcError.bad_request("Cannot pull a target object")
+        msg = "Cannot pull a target object"
+        raise RpcError.bad_request(msg)
 
     def dispose(self) -> None:
         """Decrement reference count."""

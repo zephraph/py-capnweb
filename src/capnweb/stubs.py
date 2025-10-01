@@ -7,12 +7,14 @@ provide a natural, Proxy-like API.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import Self
 
-from capnweb.hooks import StubHook
 from capnweb.payload import RpcPayload
+
+if TYPE_CHECKING:
+    from capnweb.hooks import StubHook
 
 
 class RpcStub:
@@ -55,9 +57,8 @@ class RpcStub:
         """
         if name.startswith("_"):
             # Avoid infinite recursion for private attrs
-            raise AttributeError(
-                f"'{type(self).__name__}' object has no attribute '{name}'"
-            )
+            msg = f"'{type(self).__name__}' object has no attribute '{name}'"
+            raise AttributeError(msg)
 
         # Get the property through the hook
         result_hook = self._hook.get([name])
@@ -74,9 +75,8 @@ class RpcStub:
             An RpcPromise that will resolve to the call result
         """
         if kwargs:
-            raise NotImplementedError(
-                "Keyword arguments not yet supported in RPC calls"
-            )
+            msg = "Keyword arguments not yet supported in RPC calls"
+            raise NotImplementedError(msg)
 
         # Package arguments into a payload
         args_payload = RpcPayload.from_app_params(list(args))
@@ -154,9 +154,8 @@ class RpcPromise:
             A new RpcPromise for the property
         """
         if name.startswith("_"):
-            raise AttributeError(
-                f"'{type(self).__name__}' object has no attribute '{name}'"
-            )
+            msg = f"'{type(self).__name__}' object has no attribute '{name}'"
+            raise AttributeError(msg)
 
         result_hook = self._hook.get([name])
         return RpcPromise(result_hook)
@@ -174,9 +173,8 @@ class RpcPromise:
             A new RpcPromise for the call result
         """
         if kwargs:
-            raise NotImplementedError(
-                "Keyword arguments not yet supported in RPC calls"
-            )
+            msg = "Keyword arguments not yet supported in RPC calls"
+            raise NotImplementedError(msg)
 
         args_payload = RpcPayload.from_app_params(list(args))
 

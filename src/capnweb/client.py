@@ -379,9 +379,8 @@ class Client(RpcSession):
         """
         # For now, raise NotImplementedError - this will be used when we have
         # WebSocket support for true pipelining
-        raise NotImplementedError(
-            "Direct pipelining not yet supported - use client.pipeline() instead"
-        )
+        msg = "Direct pipelining not yet supported - use client.pipeline() instead"
+        raise NotImplementedError(msg)
 
     def send_pipeline_get(
         self,
@@ -399,9 +398,8 @@ class Client(RpcSession):
             path: Property path
             result_import_id: Import ID for the result
         """
-        raise NotImplementedError(
-            "Direct pipelining not yet supported - use client.pipeline() instead"
-        )
+        msg = "Direct pipelining not yet supported - use client.pipeline() instead"
+        raise NotImplementedError(msg)
 
     async def pull_import(self, import_id: int) -> RpcPayload:
         """Pull the value from a remote capability.
@@ -416,7 +414,8 @@ class Client(RpcSession):
         """
         # Send a pull message and await the response
         if not self._transport:
-            raise RpcError.internal("No transport available")
+            msg = "No transport available"
+            raise RpcError.internal(msg)
 
         pull_msg = WirePull(import_id)
         batch = serialize_wire_batch([pull_msg])
@@ -425,7 +424,8 @@ class Client(RpcSession):
         response_text = response_bytes.decode("utf-8")
 
         if not response_text:
-            raise RpcError.internal("Empty response from pull")
+            msg = "Empty response from pull"
+            raise RpcError.internal(msg)
 
         # Parse responses
         messages = parse_wire_batch(response_text)
@@ -438,4 +438,5 @@ class Client(RpcSession):
                 error = self._parse_error(msg.error)
                 raise error
 
-        raise RpcError.internal("No response for pull")
+        msg = "No response for pull"
+        raise RpcError.internal(msg)
