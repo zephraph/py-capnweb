@@ -161,8 +161,30 @@ class PayloadStubHook(StubHook):
         # If target is callable, call it
         if callable(target):
             args.ensure_deep_copied()
-            # For now, assume synchronous call
-            # TODO: Handle async callables
+
+            # Check if target is async
+            import inspect
+
+            if inspect.iscoroutinefunction(target):
+                # Handle async callables
+                async def call_async():
+                    try:
+                        result = (
+                            await target(*args.value)
+                            if isinstance(args.value, list)
+                            else await target(args.value)
+                        )
+                        return PayloadStubHook(RpcPayload.owned(result))
+                    except Exception as e:
+                        from capnweb.error import RpcError
+
+                        error = RpcError.internal(f"Call failed: {e}")
+                        return ErrorStubHook(error)
+
+                # Return a promise hook that will resolve to the result
+                future: asyncio.Future[StubHook] = asyncio.ensure_future(call_async())
+                return PromiseStubHook(future)
+            # Handle synchronous callables
             try:
                 result = (
                     target(*args.value)
@@ -273,15 +295,66 @@ class TargetStubHook(StubHook):
             error = RpcError.bad_request("Cannot call target without method name")
             return ErrorStubHook(error)
 
-        # For now, assume path is just [method_name]
-        # TODO: Handle property navigation before call
-        method_name = str(path[-1])
+        # Handle property navigation before call
+        if len(path) == 1:
+            # Simple case: just call the method directly
+            method_name = str(path[0])
+            current_target = self.target
+        else:
+            # Navigate through properties to reach the final target
+            property_path = path[:-1]
+            method_name = str(path[-1])
+
+            # Get nested property
+            try:
+                current_obj = self.target
+                for prop in property_path:
+                    prop_value = await current_obj.get_property(str(prop))
+                    current_obj = prop_value
+                current_target = current_obj
+            except Exception as e:
+                from capnweb.error import RpcError
+
+                if isinstance(e, RpcError):
+                    return ErrorStubHook(e)
+                error = RpcError.not_found(
+                    f"Property navigation failed at path {property_path}: {e}"
+                )
+                return ErrorStubHook(error)
 
         try:
-            result = await self.target.call(
-                method_name,
-                args.value if isinstance(args.value, list) else [args.value],
-            )
+            # If current_target is the original RpcTarget, use its call method
+            if hasattr(current_target, "call") and callable(current_target.call):
+                result = await current_target.call(
+                    method_name,
+                    args.value if isinstance(args.value, list) else [args.value],
+                )
+            else:
+                # Otherwise, try to call the method directly on the object
+                method = getattr(current_target, method_name)
+                if callable(method):
+                    import inspect
+
+                    if inspect.iscoroutinefunction(method):
+                        result = (
+                            await method(*args.value)
+                            if isinstance(args.value, list)
+                            else await method(args.value)
+                        )
+                    else:
+                        result = (
+                            method(*args.value)
+                            if isinstance(args.value, list)
+                            else method(args.value)
+                        )
+                else:
+                    from capnweb.error import RpcError
+
+                    error = RpcError.bad_request(
+                        f"Method {method_name} is not callable"
+                    )
+                    return ErrorStubHook(error)
+
             return PayloadStubHook(RpcPayloadClass.from_app_return(result))
         except Exception as e:
             from capnweb.error import RpcError
