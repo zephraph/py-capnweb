@@ -44,7 +44,7 @@ class Api(RpcTarget):
             raise ValueError(msg)
         return user  # {"id": ..., "name": ...}
 
-    async def getUserProfile(self, user_id: str) -> dict[str, str]:
+    async def get_user_profile(self, user_id: str) -> dict[str, str]:
         """Get user profile by ID."""
         delay_ms = int(os.getenv("DELAY_PROFILE_MS", "120"))
         await asyncio.sleep(delay_ms / 1000.0)
@@ -55,7 +55,7 @@ class Api(RpcTarget):
             raise ValueError(msg)
         return profile  # {"id": ..., "bio": ...}
 
-    async def getNotifications(self, user_id: str) -> list[str]:
+    async def get_notifications(self, user_id: str) -> list[str]:
         """Get notifications for user."""
         delay_ms = int(os.getenv("DELAY_NOTIFS_MS", "120"))
         await asyncio.sleep(delay_ms / 1000.0)
@@ -68,9 +68,9 @@ class Api(RpcTarget):
             case "authenticate":
                 return await self.authenticate(args[0] if args else "")
             case "getUserProfile":
-                return await self.getUserProfile(args[0] if args else "")
+                return await self.get_user_profile(args[0] if args else "")
             case "getNotifications":
-                return await self.getNotifications(args[0] if args else "")
+                return await self.get_notifications(args[0] if args else "")
             case _:
                 msg = f"Method {method} not found"
                 raise RpcError.not_found(msg)

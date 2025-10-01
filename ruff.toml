@@ -23,22 +23,16 @@ lint.extend-ignore = [
     "TD002", #  	[ ] missing-todo-author
     "TD003", #  	[ ] missing-todo-link
     "T201", #    	[*] print
+    "RET504", #  	[*] unnecessary-assign
+    "PT012", #   	[ ] pytest-raises-with-multiple-statements
+    "E501", #    	[ ] line-too-long
     #  Fix
     "CPY001", #  	[ ] missing-copyright-notice
     "SLF001", #  	[ ] private-member-access
-    "E501", #    	[ ] line-too-long
     "PT011", #   	[ ] pytest-raises-too-broad
     "C901", #    	[ ] complex-structure
     "BLE001", #  	[ ] blind-except
     "INP001", #  	[ ] implicit-namespace-package
     "ASYNC110", #	[ ] async-busy-wait
     "EXE001", #  	[ ] shebang-not-executable
-    "G004", #    	[ ] logging-f-string
-    "G201", #    	[ ] logging-exc-info
-    "N802", #    	[ ] invalid-function-name
-    "PT012", #   	[ ] pytest-raises-with-multiple-statements
-    "RET504", #  	[*] unnecessary-assign
-#    "B007", #   	[*] unused-loop-control-variable
-#    "B024", #   	[ ] abstract-base-class-without-abstract-method
-#    "B027", #   	[ ] empty-method-without-abstract-decorator
 ]

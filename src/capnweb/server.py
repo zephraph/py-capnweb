@@ -349,7 +349,7 @@ class Server(RpcSession):
             # Unexpected error - log it server-side but don't expose details to client
 
             logger = logging.getLogger(__name__)
-            logger.error(f"Unexpected error in push: {e}", exc_info=True)
+            logger.exception("Unexpected error in push: %s", e)
 
             # Only include stack trace if configured (security)
             stack = traceback.format_exc() if self.config.include_stack_traces else None
@@ -398,7 +398,7 @@ class Server(RpcSession):
         except Exception as e:
             # Unexpected error - log but don't expose details
             logger = logging.getLogger(__name__)
-            logger.error(f"Unexpected error in pull: {e}", exc_info=True)
+            logger.exception("Unexpected error in pull: %s", e)
 
             export_id = import_id
             stack = traceback.format_exc() if self.config.include_stack_traces else None
