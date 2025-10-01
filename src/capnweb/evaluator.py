@@ -165,15 +165,18 @@ class ExpressionEvaluator:
                     # Property access only - navigate the whole path
                     for prop_key in expr.property_path:
                         prop_name = prop_key.value
-                        if isinstance(target, RpcTarget):
-                            target = await target.get_property(str(prop_name))
-                        elif isinstance(target, dict):
-                            target = target.get(prop_name)
-                        elif hasattr(target, str(prop_name)):
-                            target = getattr(target, str(prop_name))
-                        else:
-                            msg = f"Property {prop_name} not found on {type(target)}"
-                            raise RpcError.not_found(msg)
+                        match target:
+                            case RpcTarget():
+                                target = await target.get_property(str(prop_name))
+                            case dict():
+                                target = target.get(prop_name)
+                            case _ if hasattr(target, str(prop_name)):
+                                target = getattr(target, str(prop_name))
+                            case _:
+                                msg = (
+                                    f"Property {prop_name} not found on {type(target)}"
+                                )
+                                raise RpcError.not_found(msg)
                     return target
 
                 # If args are provided, make a method call
@@ -188,28 +191,29 @@ class ExpressionEvaluator:
                         # Navigate to the object containing the method
                         for prop_key in expr.property_path[:-1]:
                             prop_name = prop_key.value
-                            if isinstance(target, RpcTarget):
-                                target = await target.get_property(str(prop_name))
-                            elif isinstance(target, dict):
-                                target = target.get(prop_name)
-                            elif hasattr(target, str(prop_name)):
-                                target = getattr(target, str(prop_name))
-                            else:
-                                msg = (
-                                    f"Property {prop_name} not found on {type(target)}"
-                                )
-                                raise RpcError.not_found(msg)
+                            match target:
+                                case RpcTarget():
+                                    target = await target.get_property(str(prop_name))
+                                case dict():
+                                    target = target.get(prop_name)
+                                case _ if hasattr(target, str(prop_name)):
+                                    target = getattr(target, str(prop_name))
+                                case _:
+                                    msg = f"Property {prop_name} not found on {type(target)}"
+                                    raise RpcError.not_found(msg)
 
                         # Call the method (last element in property path)
                         method = str(expr.property_path[-1].value)
 
-                        if isinstance(target, RpcTarget):
-                            result = await target.call(method, args)
-                            return result
-                        if callable(target):
-                            return target(*args)
-                        msg = f"Cannot call {method} on {type(target)}, not callable"
-                        raise RpcError.bad_request(msg)
+                        match target:
+                            case RpcTarget():
+                                result = await target.call(method, args)
+                                return result
+                            case _ if callable(target):
+                                return target(*args)
+                            case _:
+                                msg = f"Cannot call {method} on {type(target)}, not callable"
+                                raise RpcError.bad_request(msg)
                     msg = "Pipeline call requires a method name in property path"
                     raise RpcError.bad_request(msg)
 
@@ -301,34 +305,36 @@ class ExpressionEvaluator:
         if remap.property_path:
             for prop_key in remap.property_path:
                 prop_name = prop_key.value
-                if isinstance(target_value, RpcTarget):
-                    target_value = await target_value.get_property(str(prop_name))
-                elif isinstance(target_value, dict):
-                    target_value = target_value.get(prop_name)
-                elif hasattr(target_value, str(prop_name)):
-                    target_value = getattr(target_value, str(prop_name))
-                else:
-                    msg = f"Property {prop_name} not found on {type(target_value)}"
-                    raise RpcError.not_found(msg)
+                match target_value:
+                    case RpcTarget():
+                        target_value = await target_value.get_property(str(prop_name))
+                    case dict():
+                        target_value = target_value.get(prop_name)
+                    case _ if hasattr(target_value, str(prop_name)):
+                        target_value = getattr(target_value, str(prop_name))
+                    case _:
+                        msg = f"Property {prop_name} not found on {type(target_value)}"
+                        raise RpcError.not_found(msg)
 
         # Resolve captures - convert WireCapture to actual values
         captured_values = []
         for capture in remap.captures:
-            if capture.type == "import":
-                import_id = ImportId(capture.id)
-                value = self._imports.get(import_id)
-                if resolve_promises and isinstance(value, asyncio.Future):
-                    value = await value
-                captured_values.append(value)
-            elif capture.type == "export":
-                export_id = ExportId(capture.id)
-                value = self._exports.get(export_id)
-                if resolve_promises and isinstance(value, asyncio.Future):
-                    value = await value
-                captured_values.append(value)
-            else:
-                msg = f"Invalid capture type: {capture.type}"
-                raise RpcError.bad_request(msg)
+            match capture.type:
+                case "import":
+                    import_id = ImportId(capture.id)
+                    value = self._imports.get(import_id)
+                    if resolve_promises and isinstance(value, asyncio.Future):
+                        value = await value
+                    captured_values.append(value)
+                case "export":
+                    export_id = ExportId(capture.id)
+                    value = self._exports.get(export_id)
+                    if resolve_promises and isinstance(value, asyncio.Future):
+                        value = await value
+                    captured_values.append(value)
+                case _:
+                    msg = f"Invalid capture type: {capture.type}"
+                    raise RpcError.bad_request(msg)
 
         # Create a mapper function that executes the instructions
         async def mapper(input_value: Any) -> Any:
@@ -411,144 +417,150 @@ class RemapExpressionEvaluator:
         Returns:
             The evaluated value
         """
-        # Handle literal values
-        if expr is None or isinstance(expr, bool | int | float | str):
-            return expr
+        match expr:
+            # Handle literal values
+            case None | bool() | int() | float() | str():
+                return expr
 
-        # Handle collections
-        if isinstance(expr, dict):
-            result = {}
-            for key, value in expr.items():
-                result[key] = await self.evaluate_instruction(value, results)
-            return result
+            # Handle collections
+            case dict():
+                result = {}
+                for key, value in expr.items():
+                    result[key] = await self.evaluate_instruction(value, results)
+                return result
 
-        if isinstance(expr, list):
-            result = []
-            for item in expr:
-                result.append(await self.evaluate_instruction(item, results))
-            return result
+            case list():
+                result = []
+                for item in expr:
+                    result.append(await self.evaluate_instruction(item, results))
+                return result
 
-        # Handle WireImport with special remap semantics
-        if isinstance(expr, WireImport):
-            import_id = expr.import_id
+            # Handle WireImport with special remap semantics
+            case WireImport():
+                import_id = expr.import_id
 
-            if import_id < 0:
-                # Negative ID - refers to captures
-                capture_index = (-import_id) - 1
-                if capture_index >= len(self._captures):
-                    msg = f"Capture index {capture_index} out of bounds (have {len(self._captures)} captures)"
-                    raise RpcError.bad_request(msg)
-                return self._captures[capture_index]
+                if import_id < 0:
+                    # Negative ID - refers to captures
+                    capture_index = (-import_id) - 1
+                    if capture_index >= len(self._captures):
+                        msg = f"Capture index {capture_index} out of bounds (have {len(self._captures)} captures)"
+                        raise RpcError.bad_request(msg)
+                    return self._captures[capture_index]
 
-            if import_id == 0:
-                # ID 0 - refers to input value
-                return self._input_value
+                if import_id == 0:
+                    # ID 0 - refers to input value
+                    return self._input_value
 
-            # Positive ID - refers to previous instruction results
-            result_index = import_id - 1
-            if result_index >= len(results):
-                msg = f"Result index {result_index} out of bounds (have {len(results)} results)"
-                raise RpcError.bad_request(msg)
-            return results[result_index]
-
-        # Handle WireExport - use base export table
-        if isinstance(expr, WireExport):
-            export_id = ExportId(expr.export_id)
-            value = self._base_exports.get(export_id)
-            if isinstance(value, asyncio.Future):
-                value = await value
-            return value
-
-        # Handle other wire types using standard evaluator logic
-        if isinstance(expr, WireError):
-            from capnweb.error import ErrorCode
-
-            return RpcError(
-                ErrorCode.INTERNAL,
-                expr.message,
-                {"type": expr.error_type, "stack": expr.stack},
-            )
-
-        if isinstance(expr, WireDate):
-            from datetime import datetime
-
-            return datetime.fromtimestamp(expr.timestamp / 1000.0, tz=UTC)
-
-        if isinstance(expr, WirePipeline):
-            # Pipeline calls within remap - resolve using remap import table
-            # The import_id could be:
-            # - Negative (capture)
-            # - Zero (input)
-            # - Positive (previous result)
-            import_id = expr.import_id
-
-            if import_id < 0:
-                capture_index = (-import_id) - 1
-                if capture_index >= len(self._captures):
-                    msg = "Capture index out of bounds"
-                    raise RpcError.bad_request(msg)
-                target = self._captures[capture_index]
-            elif import_id == 0:
-                target = self._input_value
-            else:
+                # Positive ID - refers to previous instruction results
                 result_index = import_id - 1
                 if result_index >= len(results):
-                    msg = "Result index out of bounds"
+                    msg = f"Result index {result_index} out of bounds (have {len(results)} results)"
                     raise RpcError.bad_request(msg)
-                target = results[result_index]
+                return results[result_index]
 
-            # If target is a promise/future, resolve it
-            if isinstance(target, asyncio.Future):
-                target = await target
+            # Handle WireExport - use base export table
+            case WireExport():
+                export_id = ExportId(expr.export_id)
+                value = self._base_exports.get(export_id)
+                if isinstance(value, asyncio.Future):
+                    value = await value
+                return value
 
-            # Handle property access and method calls
-            if expr.property_path and expr.args is None:
-                # Property access only
-                for prop_key in expr.property_path:
-                    prop_name = prop_key.value
-                    if isinstance(target, RpcTarget):
-                        target = await target.get_property(str(prop_name))
-                    elif isinstance(target, dict):
-                        target = target.get(prop_name)
-                    elif hasattr(target, str(prop_name)):
-                        target = getattr(target, str(prop_name))
-                    else:
-                        msg = f"Property {prop_name} not found"
-                        raise RpcError.not_found(msg)
+            # Handle other wire types using standard evaluator logic
+            case WireError():
+                from capnweb.error import ErrorCode
+
+                return RpcError(
+                    ErrorCode.INTERNAL,
+                    expr.message,
+                    {"type": expr.error_type, "stack": expr.stack},
+                )
+
+            case WireDate():
+                from datetime import datetime
+
+                return datetime.fromtimestamp(expr.timestamp / 1000.0, tz=UTC)
+
+            case WirePipeline():
+                # Pipeline calls within remap - resolve using remap import table
+                # The import_id could be:
+                # - Negative (capture)
+                # - Zero (input)
+                # - Positive (previous result)
+                import_id = expr.import_id
+
+                if import_id < 0:
+                    capture_index = (-import_id) - 1
+                    if capture_index >= len(self._captures):
+                        msg = "Capture index out of bounds"
+                        raise RpcError.bad_request(msg)
+                    target = self._captures[capture_index]
+                elif import_id == 0:
+                    target = self._input_value
+                else:
+                    result_index = import_id - 1
+                    if result_index >= len(results):
+                        msg = "Result index out of bounds"
+                        raise RpcError.bad_request(msg)
+                    target = results[result_index]
+
+                # If target is a promise/future, resolve it
+                if isinstance(target, asyncio.Future):
+                    target = await target
+
+                # Handle property access and method calls
+                if expr.property_path and expr.args is None:
+                    # Property access only
+                    for prop_key in expr.property_path:
+                        prop_name = prop_key.value
+                        match target:
+                            case RpcTarget():
+                                target = await target.get_property(str(prop_name))
+                            case dict():
+                                target = target.get(prop_name)
+                            case _ if hasattr(target, str(prop_name)):
+                                target = getattr(target, str(prop_name))
+                            case _:
+                                msg = f"Property {prop_name} not found"
+                                raise RpcError.not_found(msg)
+                    return target
+
+                # Method call
+                if expr.args is not None:
+                    args = await self.evaluate_instruction(expr.args, results)
+                    if not isinstance(args, list):
+                        args = [args]
+
+                    if expr.property_path:
+                        # Navigate to method
+                        for prop_key in expr.property_path[:-1]:
+                            prop_name = prop_key.value
+                            match target:
+                                case RpcTarget():
+                                    target = await target.get_property(str(prop_name))
+                                case dict():
+                                    target = target.get(prop_name)
+                                case _ if hasattr(target, str(prop_name)):
+                                    target = getattr(target, str(prop_name))
+                                case _:
+                                    msg = f"Property {prop_name} not found"
+                                    raise RpcError.not_found(msg)
+
+                        method = str(expr.property_path[-1].value)
+                        match target:
+                            case RpcTarget():
+                                return await target.call(method, args)
+                            case _ if callable(target):
+                                return target(*args)
+                            case _:
+                                msg = f"Cannot call {method}"
+                                raise RpcError.bad_request(msg)
+                    msg = "Pipeline call requires method name"
+                    raise RpcError.bad_request(msg)
+
                 return target
 
-            # Method call
-            if expr.args is not None:
-                args = await self.evaluate_instruction(expr.args, results)
-                if not isinstance(args, list):
-                    args = [args]
-
-                if expr.property_path:
-                    # Navigate to method
-                    for prop_key in expr.property_path[:-1]:
-                        prop_name = prop_key.value
-                        if isinstance(target, RpcTarget):
-                            target = await target.get_property(str(prop_name))
-                        elif isinstance(target, dict):
-                            target = target.get(prop_name)
-                        elif hasattr(target, str(prop_name)):
-                            target = getattr(target, str(prop_name))
-                        else:
-                            msg = f"Property {prop_name} not found"
-                            raise RpcError.not_found(msg)
-
-                    method = str(expr.property_path[-1].value)
-                    if isinstance(target, RpcTarget):
-                        return await target.call(method, args)
-                    if callable(target):
-                        return target(*args)
-                    msg = f"Cannot call {method}"
-                    raise RpcError.bad_request(msg)
-                msg = "Pipeline call requires method name"
+            # Unknown expression type
+            case _:
+                msg = f"Unknown expression type in remap: {type(expr)}"
                 raise RpcError.bad_request(msg)
-
-            return target
-
-        # Unknown expression type
-        msg = f"Unknown expression type in remap: {type(expr)}"
-        raise RpcError.bad_request(msg)

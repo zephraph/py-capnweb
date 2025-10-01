@@ -87,14 +87,16 @@ class TestService(RpcTarget):
                 # Return a capability (User object)
                 user_id = args[0]
                 if user_id not in self.users:
-                    raise RpcError.not_found(f"User {user_id} not found")
+                    msg = f"User {user_id} not found"
+                    raise RpcError.not_found(msg)
                 return self.users[user_id]
 
             case "getUserName":
                 # Nested call: get user and return name
                 user_id = args[0]
                 if user_id not in self.users:
-                    raise RpcError.not_found(f"User {user_id} not found")
+                    msg = f"User {user_id} not found"
+                    raise RpcError.not_found(msg)
                 return self.users[user_id].name
 
             case "createUser":
@@ -119,13 +121,17 @@ class TestService(RpcTarget):
                 error_type = args[0] if args else "internal"
                 match error_type:
                     case "not_found":
-                        raise RpcError.not_found("Resource not found")
+                        msg = "Resource not found"
+                        raise RpcError.not_found(msg)
                     case "bad_request":
-                        raise RpcError.bad_request("Invalid request")
+                        msg = "Invalid request"
+                        raise RpcError.bad_request(msg)
                     case "permission_denied":
-                        raise RpcError.permission_denied("Access denied")
+                        msg = "Access denied"
+                        raise RpcError.permission_denied(msg)
                     case _:
-                        raise RpcError.internal("Internal server error")
+                        msg = "Internal server error"
+                        raise RpcError.internal(msg)
 
             case "processArray":
                 # Test array handling

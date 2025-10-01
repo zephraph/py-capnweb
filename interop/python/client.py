@@ -85,20 +85,24 @@ async def run_tests(client: Client) -> dict[str, Any]:
     print("  11. Error handling (not_found)...")
     try:
         await client.call(0, "throwError", ["not_found"])
-        assert False, "Should have raised an error"
+        msg = "Should have raised an error"
+        raise AssertionError(msg)
     except Exception as e:
         results["errorNotFound"] = str(e)
-        assert "not found" in str(e).lower(), f"Wrong error: {e}"
+        if "not found" not in str(e).lower():  # noqa: PT017
+            msg = f"Wrong error: {e}"
+            raise AssertionError(msg) from e
 
     print("  12. Error handling (bad_request)...")
     try:
         await client.call(0, "throwError", ["bad_request"])
-        assert False, "Should have raised an error"
+        msg = "Should have raised an error"
+        raise AssertionError(msg)
     except Exception as e:
         results["errorBadRequest"] = str(e)
-        assert "invalid" in str(e).lower() or "bad" in str(e).lower(), (
-            f"Wrong error: {e}"
-        )
+        if "invalid" not in str(e).lower() and "bad" not in str(e).lower():  # noqa: PT017
+            msg = f"Wrong error: {e}"
+            raise AssertionError(msg) from e
 
     # Test 11: Batch/concurrent calls
     print("  13. Concurrent batch calls...")

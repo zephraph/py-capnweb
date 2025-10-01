@@ -291,15 +291,18 @@ def wire_expression_from_json(value: Any) -> WireExpression:
             is_valid_special_form = False
             if inner and isinstance(inner[0], str):
                 tag = inner[0]
-                if tag == "error" and len(inner) >= 3:
-                    is_valid_special_form = True
-                elif tag in {"import", "export", "promise"} and len(inner) == 2:
-                    is_valid_special_form = True
-                elif tag == "pipeline" and len(inner) >= 2:
-                    is_valid_special_form = True
-                elif tag == "date" and len(inner) == 2:
-                    is_valid_special_form = True
-                elif tag == "remap" and len(inner) == 5:
+                if (
+                    tag == "error"
+                    and len(inner) >= 3
+                    or tag in {"import", "export", "promise"}
+                    and len(inner) == 2
+                    or tag == "pipeline"
+                    and len(inner) >= 2
+                    or tag == "date"
+                    and len(inner) == 2
+                    or tag == "remap"
+                    and len(inner) == 5
+                ):
                     is_valid_special_form = True
 
             if is_valid_special_form:
@@ -351,7 +354,9 @@ def wire_expression_to_json(expr: WireExpression, escape_arrays: bool = False) -
 
         case dict():
             # Propagate escape_arrays flag to dict values (for arrays nested in objects)
-            return {k: wire_expression_to_json(v, escape_arrays) for k, v in expr.items()}
+            return {
+                k: wire_expression_to_json(v, escape_arrays) for k, v in expr.items()
+            }
 
         case list():
             # Recursively serialize list items (don't propagate escaping to nested items)
