@@ -371,7 +371,7 @@ class TestResumeIntegration:
         # Verify capability was restored
         from capnweb.ids import ExportId
 
-        assert server._exports.contains(ExportId(0))
+        assert server._exports_typed.contains(ExportId(0))
 
     async def test_resume_token_with_multiple_capabilities(self) -> None:
         """Test resume token with multiple capabilities."""
@@ -413,7 +413,7 @@ class TestResumeIntegration:
         assert success
 
         # Verify capabilities count
-        exports_count = len(server._exports._entries)
+        exports_count = len(server._exports_typed._entries)
         assert exports_count == 3
 
     def test_resume_token_serialization_roundtrip(self) -> None:

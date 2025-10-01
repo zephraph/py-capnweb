@@ -12,6 +12,7 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from capnweb.hooks import StubHook
     from capnweb.stubs import RpcPromise, RpcStub
 
 
@@ -157,18 +158,18 @@ class RpcPayload:
         match obj:
             case RpcStub():
                 # Create a duplicate (shares the hook, increments refcount)
-                dup = obj._hook.dup()
                 from capnweb.stubs import RpcStub as StubClass
 
+                dup: StubHook = obj._hook.dup()  # type: ignore[assignment]
                 new_stub = StubClass(dup)
                 self.stubs.append(new_stub)
                 return new_stub
 
             case RpcPromise():
                 # Create a duplicate (shares the hook, increments refcount)
-                dup = obj._hook.dup()
                 from capnweb.stubs import RpcPromise as PromiseClass
 
+                dup: StubHook = obj._hook.dup()  # type: ignore[assignment]
                 new_promise = PromiseClass(dup)
                 # Note: parent and property tracking would happen at the container level
                 return new_promise

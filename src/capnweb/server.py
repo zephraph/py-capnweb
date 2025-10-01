@@ -7,7 +7,7 @@ import logging
 import traceback
 from collections import UserDict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from aiohttp import web
 from typing_extensions import Self
@@ -34,6 +34,39 @@ from capnweb.wire import (
 
 if TYPE_CHECKING:
     from capnweb.types import RpcTarget
+
+
+class ExportsProtocol(Protocol):
+    """Protocol for exports that support both dict and ExportTable API."""
+
+    def contains(self, export_id: Any) -> bool:
+        """Check if export ID exists."""
+        ...
+
+    @property
+    def _entries(self) -> dict[int, StubHook]:
+        """Get raw entries dict."""
+        ...
+
+    def __getitem__(self, key: int) -> StubHook:
+        """Get item by key."""
+        ...
+
+    def __setitem__(self, key: int, value: StubHook) -> None:
+        """Set item by key."""
+        ...
+
+    def keys(self) -> Any:
+        """Get keys."""
+        ...
+
+    def clear(self) -> None:
+        """Clear all items."""
+        ...
+
+    def update(self, other: Any) -> None:
+        """Update with other dict."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -94,6 +127,11 @@ class Server(RpcSession):
 
         # Create a wrapper that exposes both dict and ExportTable API
         self._exports_wrapper = self._create_exports_wrapper()
+
+    @property
+    def _exports_typed(self) -> ExportsProtocol:
+        """Get _exports as ExportsProtocol for type checking."""
+        return cast("ExportsProtocol", self._exports)
 
     def _create_exports_wrapper(self):
         """Create a wrapper that provides both dict and ExportTable API."""
@@ -415,7 +453,13 @@ class Server(RpcSession):
         self._exports.clear()
         self._exports.update(exports_dict)
 
-        # TODO: Properly restore import state when implementing full resume support
+        # Restore imports if any were saved
+        # Note: For HTTP batch mode, imports are batch-local, so restoration
+        # mainly applies to WebSocket/stateful connections
+        if imports_dict:
+            self._imports.clear()
+            self._imports.update(imports_dict)
+
         return True
 
     def invalidate_resume_token(self, session_id: str) -> None:

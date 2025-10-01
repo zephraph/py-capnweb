@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import asyncio
 from abc import ABC, abstractmethod
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
+
+from typing_extensions import Self
 
 from capnweb.payload import RpcPayload
 
@@ -86,7 +89,7 @@ class StubHook(ABC):
         ...
 
     @abstractmethod
-    def dup(self) -> StubHook:
+    def dup(self) -> Self:
         """Duplicate this hook (increment reference count).
 
         This is used when copying payloads to ensure proper refcounting.
@@ -122,7 +125,7 @@ class ErrorStubHook(StubHook):
     def dispose(self) -> None:
         """Nothing to dispose for errors."""
 
-    def dup(self) -> StubHook:
+    def dup(self) -> Self:
         """Errors can be freely shared."""
         return self
 
@@ -256,10 +259,10 @@ class PayloadStubHook(StubHook):
         """Dispose the payload."""
         self.payload.dispose()
 
-    def dup(self) -> StubHook:
+    def dup(self) -> Self:
         """Payloads can be shared (they manage their own stubs)."""
         # Note: The payload already tracks its stubs for disposal
-        return PayloadStubHook(self.payload)
+        return PayloadStubHook(self.payload)  # type: ignore[return-value]
 
 
 @dataclass
@@ -325,7 +328,7 @@ class TargetStubHook(StubHook):
         try:
             # If current_target is the original RpcTarget, use its call method
             if hasattr(current_target, "call") and callable(current_target.call):
-                result = await current_target.call(
+                result = await current_target.call(  # type: ignore[misc]
                     method_name,
                     args.value if isinstance(args.value, list) else [args.value],
                 )
@@ -411,11 +414,17 @@ class TargetStubHook(StubHook):
         raise RpcError.bad_request(msg)
 
     def dispose(self) -> None:
-        """Decrement reference count."""
+        """Decrement reference count and notify target if disposable."""
         self.ref_count -= 1
-        # TODO: Notify when refcount reaches 0 if target is disposable
 
-    def dup(self) -> StubHook:
+        # Notify target when refcount reaches 0 if it implements disposal
+        if self.ref_count == 0:
+            if hasattr(self.target, "dispose") and callable(self.target.dispose):
+                # Ignore disposal errors - best effort cleanup
+                with suppress(Exception):
+                    self.target.dispose()
+
+    def dup(self) -> Self:
         """Increment reference count."""
         self.ref_count += 1
         return self
@@ -489,7 +498,7 @@ class RpcImportHook(StubHook):
         if self.ref_count == 0:
             self.session.release_import(self.import_id)
 
-    def dup(self) -> StubHook:
+    def dup(self) -> Self:
         """Increment refcount."""
         self.ref_count += 1
         return self
@@ -560,6 +569,6 @@ class PromiseStubHook(StubHook):
             except Exception:
                 pass
 
-    def dup(self) -> StubHook:
+    def dup(self) -> Self:
         """Share the same future (promises can be shared)."""
-        return PromiseStubHook(self.future)
+        return PromiseStubHook(self.future)  # type: ignore[return-value]

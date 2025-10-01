@@ -62,7 +62,7 @@ class RpcStub:
 
         # Get the property through the hook
         result_hook = self._hook.get([name])
-        return RpcPromise(result_hook)
+        return RpcPromise(result_hook)  # type: ignore[arg-type]
 
     def __call__(self, *args: Any, **kwargs: Any) -> RpcPromise:
         """Call the stub as a function.
@@ -158,7 +158,7 @@ class RpcPromise:
             raise AttributeError(msg)
 
         result_hook = self._hook.get([name])
-        return RpcPromise(result_hook)
+        return RpcPromise(result_hook)  # type: ignore[arg-type]
 
     def __call__(self, *args: Any, **kwargs: Any) -> RpcPromise:
         """Call the promised value as a function, returning a new promise.

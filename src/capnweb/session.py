@@ -324,28 +324,3 @@ class RpcSession(ABC):
             The StubHook for this import, or None if not found
         """
         return self._imports.get(import_id)
-
-    # Compatibility layer for old table-based tests
-    # TODO: Remove once tests are updated to new architecture
-
-    class _ExportsCompat:
-        """Compatibility wrapper for old ExportTable API."""
-
-        def __init__(self, exports: dict[int, StubHook]):
-            self._exports = exports
-
-        def contains(self, export_id: Any) -> bool:
-            """Check if export ID exists."""
-            if hasattr(export_id, "value"):
-                return export_id.value in self._exports
-            return export_id in self._exports
-
-        @property
-        def _entries(self) -> dict[int, StubHook]:
-            """Get raw entries dict."""
-            return self._exports
-
-    @property
-    def _exports_compat(self) -> _ExportsCompat:
-        """Get compatibility wrapper for _exports."""
-        return self._ExportsCompat(self._exports)
