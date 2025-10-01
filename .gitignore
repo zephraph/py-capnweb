@@ -1,3 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.aider*
+
+# Misc
 capnweb-ts
 .python-version
 node_modules
+
+#
+.DS_Store
+.coverage
+.idea/
+interop/.coverage
