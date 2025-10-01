@@ -12,6 +12,7 @@ Run:
 
 import asyncio
 import logging
+from dataclasses import dataclass, field
 from typing import Any
 
 from capnweb.error import RpcError
@@ -22,15 +23,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class User(RpcTarget):
     """Represents a single user - a capability that can be passed between services."""
 
-    def __init__(self, user_id: str, username: str, email: str, role: str = "user"):
-        self.user_id = user_id
-        self.username = username
-        self.email = email
-        self.role = role
-        self.metadata: dict[str, Any] = {}
+    user_id: str
+    username: str
+    email: str
+    role: str = "user"
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     async def call(self, method: str, args: list[Any]) -> Any:
         """Handle method calls on the user."""

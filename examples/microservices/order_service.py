@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from capnweb.client import Client, ClientConfig
@@ -25,15 +26,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class Order(RpcTarget):
     """Represents a single order."""
 
-    def __init__(self, order_id: str, user_id: str, items: list[dict], total: float):
-        self.order_id = order_id
-        self.user_id = user_id
-        self.items = items
-        self.total = total
-        self.status = "pending"
+    order_id: str
+    user_id: str
+    items: list[dict]
+    total: float
+    status: str = "pending"
 
     async def call(self, method: str, args: list[Any]) -> Any:
         """Handle method calls."""

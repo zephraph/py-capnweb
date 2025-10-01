@@ -10,6 +10,7 @@ Run (after starting supervisor.py):
 import asyncio
 
 from capnweb.client import Client, ClientConfig
+from capnweb.hooks import RpcImportHook
 
 
 async def main() -> None:  # noqa: C901
@@ -35,8 +36,6 @@ async def main() -> None:  # noqa: C901
             worker_b_cap = results[1]
 
             # Extract the import IDs so we can call methods using client.call()
-            from capnweb.hooks import RpcImportHook
-
             assert isinstance(worker_a_cap._hook, RpcImportHook)
             assert isinstance(worker_b_cap._hook, RpcImportHook)
 

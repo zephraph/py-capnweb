@@ -18,7 +18,7 @@ This example demonstrates a real-time chat application using Cap'n Web with WebS
 │  Chat Server    │           │  Chat Clients   │
 │                 │           │   (multiple)    │
 │  ┌───────────┐  │           │                 │
-│  │ ChatRoom  │◄─┼───────────┼──▶ Client 1    │
+│  │ ChatRoom  │◄─┼───────────┼──▶ Client 1     │
 │  │           │  │           │                 │
 │  │ - clients │  │  WebSocket│  ┌───────────┐  │
 │  │ - history │  │◄──────────┼──┤ChatClient │  │

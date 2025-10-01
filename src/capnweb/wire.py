@@ -317,12 +317,12 @@ def wire_expression_from_json(value: Any) -> WireExpression:  # noqa: C901
             match tag:
                 case "error":
                     return WireError.from_json(value)
-                case "import":
-                    return WireImport.from_json(value)
-                case "export":
-                    return WireExport.from_json(value)
-                case "promise":
-                    return WirePromise.from_json(value)
+                # DON'T convert export/import/promise here - these are application-level
+                # expressions that the Parser needs to handle to create RpcStubs.
+                # Only convert wire-level expressions (error, pipeline, date, remap).
+                case "import" | "export" | "promise":
+                    # Leave these as plain lists for the Parser
+                    return value
                 case "pipeline":
                     return WirePipeline.from_json(value)
                 case "date":

@@ -10,13 +10,13 @@ Run:
 import asyncio
 from typing import Any
 
+from worker import Worker
+
 from capnweb.error import RpcError
 from capnweb.hooks import TargetStubHook
 from capnweb.server import Server, ServerConfig
 from capnweb.stubs import RpcStub
 from capnweb.types import RpcTarget
-
-from worker import Worker
 
 
 class Supervisor(RpcTarget):

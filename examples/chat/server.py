@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from capnweb.error import RpcError
@@ -28,12 +29,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class ChatRoom(RpcTarget):
     """Chat room that manages multiple clients and broadcasts messages."""
 
-    def __init__(self):
-        self.clients: dict[str, RpcStub] = {}  # username -> client capability
-        self.message_history: list[dict[str, str]] = []
+    clients: dict[str, RpcStub] = field(default_factory=dict)  # username -> client capability
+    message_history: list[dict[str, str]] = field(default_factory=list)
 
     async def call(self, method: str, args: list[Any]) -> Any:
         """Handle RPC method calls."""

@@ -14,6 +14,7 @@ import asyncio
 import logging
 import sys
 from contextlib import suppress
+from dataclasses import dataclass
 from typing import Any
 
 from capnweb.client import Client, ClientConfig
@@ -24,11 +25,11 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class ChatClient(RpcTarget):
     """Client-side chat capability that receives messages from the server."""
 
-    def __init__(self, username: str):
-        self.username = username
+    username: str
 
     async def call(self, method: str, args: list[Any]) -> Any:
         """Handle RPC method calls from the server."""
