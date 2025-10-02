@@ -7,10 +7,14 @@ WebTransport offers high-performance bidirectional communication over HTTP/3/QUI
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import urlparse
+
+from aioquic.asyncio.protocol import QuicConnectionProtocol
+from aioquic.h3.connection import H3Connection
 
 try:
     from aioquic.asyncio import QuicConnectionProtocol, connect, serve
@@ -22,15 +26,14 @@ try:
         WebTransportStreamDataReceived,
     )
     from aioquic.quic.configuration import QuicConfiguration
-    from aioquic.quic.events import QuicEvent, StreamDataReceived
+    from aioquic.quic.events import StreamDataReceived
 
     WEBTRANSPORT_AVAILABLE = True
 except ImportError:
     WEBTRANSPORT_AVAILABLE = False
 
 if TYPE_CHECKING:
-    from aioquic.asyncio.protocol import QuicConnectionProtocol
-    from aioquic.h3.connection import H3Connection
+    from aioquic.quic.events import QuicEvent
 
 logger = logging.getLogger(__name__)
 
@@ -353,10 +356,8 @@ class WebTransportClient:
 
         if self._task:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
 

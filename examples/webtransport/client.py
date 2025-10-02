@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 
 from capnweb.webtransport import WebTransportClient
 
@@ -59,7 +60,7 @@ async def main() -> None:
                 print(f"   Sent: {msg.decode()}")
 
             # Receive all responses
-            for i in range(len(messages)):
+            for _i in range(len(messages)):
                 response = await client.receive(timeout=5.0)
                 print(f"   Received: {response.decode()}")
 
@@ -77,8 +78,6 @@ async def main() -> None:
 
     except Exception as e:
         print(f"\n❌ Error: {e}")
-        import traceback
-
         traceback.print_exc()
 
 

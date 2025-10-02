@@ -17,7 +17,17 @@ try:
 except ImportError:
     WEBTRANSPORT_AVAILABLE = False
 
-from capnweb.certs import generate_self_signed_cert
+from capnweb.certs import (
+    generate_self_signed_cert,
+    load_certificate,
+    load_private_key,
+    verify_certificate,
+)
+from capnweb.transports import (
+    HttpBatchTransport,
+    WebTransportTransport,
+    create_transport,
+)
 
 pytestmark = pytest.mark.skipif(
     not WEBTRANSPORT_AVAILABLE,
@@ -43,8 +53,6 @@ class TestCertificateGeneration:
         assert key_path.name == "localhost.key"
 
         # Verify certificate can be loaded
-        from capnweb.certs import load_certificate, load_private_key
-
         cert = load_certificate(cert_path)
         key = load_private_key(key_path)
 
@@ -63,8 +71,6 @@ class TestCertificateGeneration:
 
     def test_verify_certificate(self, tmp_path):
         """Test certificate verification."""
-        from capnweb.certs import load_certificate, verify_certificate
-
         cert_path, _ = generate_self_signed_cert(
             hostname="localhost",
             output_dir=tmp_path,
@@ -135,21 +141,15 @@ class TestWebTransportTransport:
 
     def test_import_transport(self):
         """Test importing WebTransportTransport."""
-        from capnweb.transports import WebTransportTransport
-
         assert WebTransportTransport is not None
 
     def test_create_transport(self):
         """Test creating WebTransportTransport instance."""
-        from capnweb.transports import WebTransportTransport
-
         transport = WebTransportTransport("https://localhost:4433/test")
         assert transport is not None
 
     def test_transport_factory_webtransport(self):
         """Test transport factory creates WebTransportTransport for https://.../wt URLs."""
-        from capnweb.transports import WebTransportTransport, create_transport
-
         # WebTransport URLs (with /wt or :4433)
         transport1 = create_transport("https://localhost:4433/rpc/wt")
         assert isinstance(transport1, WebTransportTransport)
@@ -159,8 +159,6 @@ class TestWebTransportTransport:
 
     def test_transport_factory_http_batch(self):
         """Test transport factory creates HttpBatchTransport for regular https:// URLs."""
-        from capnweb.transports import HttpBatchTransport, create_transport
-
         # Regular HTTPS should use HttpBatchTransport
         transport = create_transport("https://localhost/rpc/batch")
         assert isinstance(transport, HttpBatchTransport)

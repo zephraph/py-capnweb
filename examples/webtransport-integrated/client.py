@@ -10,6 +10,7 @@ Run:
 from __future__ import annotations
 
 import asyncio
+import traceback
 
 from capnweb.client import Client, ClientConfig
 
@@ -73,8 +74,6 @@ async def main() -> None:
 
     except Exception as e:
         print(f"\n❌ Error: {e}")
-        import traceback
-
         traceback.print_exc()
 
 

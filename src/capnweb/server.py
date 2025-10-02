@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import traceback
 from collections import UserDict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
 from aiohttp import web
@@ -30,6 +32,14 @@ from capnweb.wire import (
     parse_wire_batch,
     serialize_wire_batch,
 )
+
+# Optional WebTransport support
+try:
+    from capnweb.webtransport import WebTransportServer
+
+    WEBTRANSPORT_AVAILABLE = True
+except ImportError:
+    WEBTRANSPORT_AVAILABLE = False
 
 if TYPE_CHECKING:
     from capnweb.types import RpcTarget
@@ -219,10 +229,8 @@ class Server(RpcSession):
         # Stop WebTransport server if running
         if self._webtransport_task:
             self._webtransport_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._webtransport_task
-            except asyncio.CancelledError:
-                pass
             self._webtransport_task = None
 
         if self._webtransport_server:
@@ -592,12 +600,13 @@ class Server(RpcSession):
             print("         Skipping WebTransport server startup")
             return
 
+        if not WEBTRANSPORT_AVAILABLE:
+            print("WARNING: WebTransport requires aioquic library")
+            print("         Install with: uv pip install aioquic")
+            print("         Skipping WebTransport server startup")
+            return
+
         try:
-            # Import WebTransport conditionally
-            from pathlib import Path
-
-            from capnweb.webtransport import WebTransportServer
-
             # Create WebTransport server
             self._webtransport_server = WebTransportServer(
                 host=self.config.host,
@@ -617,10 +626,6 @@ class Server(RpcSession):
                 f"WebTransport server listening on https://{self.config.host}:{self.config.webtransport_port}/rpc/wt"
             )
 
-        except ImportError:
-            print("WARNING: WebTransport requires aioquic library")
-            print("         Install with: uv pip install aioquic")
-            print("         Skipping WebTransport server startup")
         except Exception as e:
             print(f"ERROR: Failed to start WebTransport server: {e}")
             raise

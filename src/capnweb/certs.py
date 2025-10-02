@@ -47,10 +47,7 @@ def generate_self_signed_cert(
         print(f"Private key: {key_path}")
         ```
     """
-    if output_dir is None:
-        output_dir = Path.cwd()
-    else:
-        output_dir = Path(output_dir)
+    output_dir = Path.cwd() if output_dir is None else Path(output_dir)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -144,8 +141,7 @@ def _build_san_list(hostname: str) -> list[x509.GeneralName]:
 
     # If it's localhost, also add 127.0.0.1 and ::1
     if hostname == "localhost":
-        san_list.append(x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")))
-        san_list.append(x509.IPAddress(ipaddress.IPv6Address("::1")))
+        san_list.extend((x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")), x509.IPAddress(ipaddress.IPv6Address("::1"))))
 
     # Try to parse as IP address
     try:

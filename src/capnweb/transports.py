@@ -6,35 +6,17 @@ for different communication methods (HTTP batch, WebSocket, WebTransport).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Self
 
 import aiohttp
 
-if TYPE_CHECKING:
-    try:
-        from aioquic.asyncio import QuicConnectionProtocol
-        from aioquic.h3.connection import H3Connection
-        from aioquic.quic.configuration import QuicConfiguration
+# Optional WebTransport support
+try:
+    from capnweb.webtransport import WebTransportClient
 
-        WEBTRANSPORT_AVAILABLE = True
-    except ImportError:
-        WEBTRANSPORT_AVAILABLE = False
-else:
-    try:
-        from aioquic.asyncio import QuicConnectionProtocol, connect
-        from aioquic.h3.connection import H3Connection
-        from aioquic.h3.events import (
-            DataReceived,
-            H3Event,
-            HeadersReceived,
-            WebTransportStreamDataReceived,
-        )
-        from aioquic.quic.configuration import QuicConfiguration
-        from aioquic.quic.events import QuicEvent
-
-        WEBTRANSPORT_AVAILABLE = True
-    except ImportError:
-        WEBTRANSPORT_AVAILABLE = False
+    WEBTRANSPORT_AVAILABLE = True
+except ImportError:
+    WEBTRANSPORT_AVAILABLE = False
 
 
 class HttpBatchTransport:
@@ -254,9 +236,6 @@ class WebTransportTransport:
         if not WEBTRANSPORT_AVAILABLE:
             msg = "WebTransport requires aioquic library: pip install aioquic"
             raise RuntimeError(msg)
-
-        # Import the WebTransportClient here to avoid circular imports
-        from capnweb.webtransport import WebTransportClient
 
         self._client = WebTransportClient(url, cert_path, verify_mode)
 
