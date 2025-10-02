@@ -35,6 +35,5 @@ lint.extend-ignore = [
     "PT011", #   	[ ] pytest-raises-too-broad
     "BLE001", #  	[ ] blind-except
     "INP001", #  	[ ] implicit-namespace-package
-#    "EXE001", #  	[ ] shebang-not-executable
     "PLC1901",
 ]

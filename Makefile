@@ -1,6 +1,6 @@
 .PHONY: help install test lint type-check format clean
 
-all: lint test
+all: test lint
 
 install:
 	uv sync
@@ -11,6 +11,9 @@ test:
 
 test-cov:
 	pytest tests --cov=capnweb --cov-report=html --cov-report=term
+
+
+check: lint
 
 lint:
 	ruff check

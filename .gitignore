@@ -9,14 +9,12 @@ wheels/
 # Virtual environments
 .venv
 .aider*
-
-# Misc
-capnweb-ts
 .python-version
+
+# TS version
+capnweb-ts
 node_modules
 
-#
-.DS_Store
+# Test cruft
 .coverage
-.idea/
-interop/.coverage
+.hypothesis

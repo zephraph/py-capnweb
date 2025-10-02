@@ -23,7 +23,7 @@
 - ✅ TypeScript interoperability (array escaping)
 - ✅ Code quality improvements (reduced cyclomatic complexity)
 - ✅ Legacy code removed (evaluator.py, tables.py)
-- ✅ **352 tests, 76% coverage** (all tests passing)
+- ✅ **384 tests, 73% coverage** (all tests passing, +44 property tests)
 - ✅ **0 linting errors** (ruff)
 - ✅ **0 typing errors** (pyrefly)
 
@@ -56,39 +56,6 @@
 - [ ] Set up Sphinx for hosted docs (optional - markdown docs sufficient for now)
 - [ ] Write TypeScript → Python migration guide
 
----
-
-## Medium Priority
-
-### WebTransport / HTTP/3 ✅ **COMPLETE** (v0.4.0)
-
-Modern transport using HTTP/3 and QUIC.
-
-**Completed:**
-- ✅ Certificate management utilities (src/capnweb/certs.py)
-- ✅ WebTransportServer class
-- ✅ WebTransportClient class
-- ✅ Bidirectional streams support
-- ✅ Certificate management (generate_self_signed_cert, verify_certificate)
-- ✅ Transport integration (WebTransportTransport)
-- ✅ Server integration (enable_webtransport flag)
-- ✅ 12 unit tests (all passing)
-- ✅ Standalone examples (examples/webtransport/)
-- ✅ Integrated examples (examples/webtransport-integrated/)
-- ✅ Full documentation
-
-**Benefits:**
-- Better performance than WebSocket
-- Built-in multiplexing
-- 0-RTT reconnection
-- Future-proof
-
-**Files created:**
-- ✅ `src/capnweb/certs.py` - Certificate management
-- ✅ `src/capnweb/webtransport.py` - WebTransport client/server
-- ✅ `tests/test_webtransport.py` - 12 unit tests
-- ✅ `examples/webtransport/` - Standalone example
-- ✅ `examples/webtransport-integrated/` - Integrated example
 
 ---
 
@@ -235,19 +202,36 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### Property-Based Testing
+### Property-Based Testing ✅ **COMPLETE**
 
 Generate random inputs to find edge cases using Hypothesis.
 
-**Implementation:**
-- [ ] Add Hypothesis library
-- [ ] Property tests for wire serialization
-- [ ] Property tests for ID allocation
-- [ ] Property tests for expression evaluation
-- [ ] Fuzz testing for error paths
+**Completed:**
+- ✅ Added Hypothesis library (v6.100.0+)
+- ✅ Property tests for wire serialization (WireError, WireImport, WireExport, WirePromise, WireDate, WireCapture, WireRemap, etc.)
+- ✅ Property tests for ID allocation (sequential, bijective conversions, local/remote checks)
+- ✅ Property tests for expression evaluation (plain arrays, error expressions, capability references)
+- ✅ Property tests for RpcPayload ownership semantics (PARAMS, RETURN, OWNED sources, deep copying)
+- ✅ Property tests for RpcError factory methods (all error codes, data preservation)
+- ✅ Fuzz testing for error paths (malformed messages, various value types)
+- ✅ 44 property-based tests covering core invariants
+- ✅ All tests passing with 100+ examples per test
 
-**Files:**
-- `tests/test_properties.py` (new)
+**Files created:**
+- ✅ `tests/test_properties.py` - 44 property tests (766 lines)
+
+**Coverage improvements from PBT:**
+- error.py: 87% → 92% (+5%)
+- payload.py: 32% → 65% (+33%)
+- wire.py: 55% → 62% (+7%)
+
+**Benefits:**
+- Discovered edge cases in wire protocol parsing
+- Verified ID allocation invariants hold across wide range of values
+- Confirmed JSON serialization roundtrips work correctly
+- Validated error handling for malformed inputs
+- Tested payload ownership semantics prevent mutation bugs
+- Verified all RpcError factory methods produce correct error codes
 
 ---
 

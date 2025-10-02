@@ -22,16 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Certificate generation guides
 
 ### Changed
-- **Code Quality Improvements**
-  - Fixed all linting issues (0 errors with ruff)
-  - Fixed all typing issues (0 errors with pyrefly, 17 intentional ignores)
-  - Converted f-strings to lazy % formatting in logging statements
-  - Used `asyncio.Event().wait()` instead of `while True: await asyncio.sleep(1)` patterns
-  - Used `contextlib.suppress()` instead of try/except/pass patterns
-- **Type Improvements**
-  - Added `WebTransportTransport` to `Client._transport` type annotation
-  - Added explicit type annotations for `asyncio.gather()` results
-  - Added type ignores for aioquic library compatibility
 - **API Improvements**
   - `Client` now supports all three transports: HTTP Batch, WebSocket, and WebTransport
   - Transport auto-detection based on URL scheme and path
