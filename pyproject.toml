@@ -37,7 +37,7 @@ Homepage = "https://github.com/abilian/py-capnweb"
 Documentation = "https://github.com/abilian/py-capnweb#readme"
 Repository = "https://github.com/abilian/py-capnweb.git"
 Issues = "https://github.com/abilian/py-capnweb/issues"
-Changelog = "https://github.com/abilian/py-capnweb/releases"
+Changelog = "https://github.com/abilian/py-capnweb/blob/main/CHANGES.md"
 
 [project.optional-dependencies]
 dev = [
@@ -100,11 +100,13 @@ exclude_lines = [
 [dependency-groups]
 dev = [
     "honcho>=2.0.0",
+    "hypothesis>=6.100.0",
     "nox>=2025.5.1",
     "pyrefly>=0.35.0",
     "pytest-asyncio>=1.2.0",
     "pyupgrade>=3.20.0",
     "ruff>=0.13.2",
+    "tox>=4.30.2",
     "ty>=0.0.1a21",
     "uv-build>=0.8.22",
     "vulture>=2.14",
