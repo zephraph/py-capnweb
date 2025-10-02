@@ -13,31 +13,41 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import urlparse
 
-from aioquic.asyncio.protocol import QuicConnectionProtocol
-from aioquic.h3.connection import H3Connection
-
+# Optional aioquic dependency
 try:
-    from aioquic.asyncio import QuicConnectionProtocol, connect, serve
-    from aioquic.h3.connection import H3Connection
-    from aioquic.h3.events import (
+    from aioquic.asyncio import (  # type: ignore[import-not-found]
+        QuicConnectionProtocol,
+        connect,
+        serve,
+    )
+    from aioquic.asyncio.protocol import (
+        QuicConnectionProtocol as QuicProtocol,  # type: ignore[import-not-found]
+    )
+    from aioquic.h3.connection import H3Connection  # type: ignore[import-not-found]
+    from aioquic.h3.events import (  # type: ignore[import-not-found]
         DataReceived,
         H3Event,
         HeadersReceived,
         WebTransportStreamDataReceived,
     )
-    from aioquic.quic.configuration import QuicConfiguration
+    from aioquic.quic.configuration import (
+        QuicConfiguration,  # type: ignore[import-not-found]
+    )
 
     WEBTRANSPORT_AVAILABLE = True
 except ImportError:
     WEBTRANSPORT_AVAILABLE = False
+    QuicConnectionProtocol = object  # type: ignore[assignment,misc]
+    QuicProtocol = object  # type: ignore[assignment,misc]
+    H3Connection = object  # type: ignore[assignment,misc]
 
 if TYPE_CHECKING:
-    from aioquic.quic.events import QuicEvent
+    from aioquic.quic.events import QuicEvent  # type: ignore[import-not-found]
 
 logger = logging.getLogger(__name__)
 
 
-class WebTransportClientProtocol(QuicConnectionProtocol):
+class WebTransportClientProtocol(QuicConnectionProtocol):  # type: ignore[misc,valid-type]
     """QUIC client protocol for WebTransport."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -54,10 +64,10 @@ class WebTransportClientProtocol(QuicConnectionProtocol):
             event: QUIC event from the connection
         """
         if self._http is None:
-            self._http = H3Connection(self._quic)
+            self._http = H3Connection(self._quic)  # type: ignore[attr-defined]
 
         # Process through H3
-        for h3_event in self._http.handle_event(event):
+        for h3_event in self._http.handle_event(event):  # type: ignore[attr-defined]
             self._h3_event_received(h3_event)
 
     def _h3_event_received(self, event: H3Event) -> None:
@@ -87,17 +97,17 @@ class WebTransportClientProtocol(QuicConnectionProtocol):
             data: Data to send
         """
         if self._http is None:
-            self._http = H3Connection(self._quic)
+            self._http = H3Connection(self._quic)  # type: ignore[attr-defined]
 
         # Create bidirectional stream if needed
         if self._stream_id is None:
-            self._stream_id = self._quic.get_next_available_stream_id(
+            self._stream_id = self._quic.get_next_available_stream_id(  # type: ignore[attr-defined]
                 is_unidirectional=False
             )
 
         # Send data
-        self._http._quic.send_stream_data(self._stream_id, data, end_stream=False)
-        self.transmit()
+        self._http._quic.send_stream_data(self._stream_id, data, end_stream=False)  # type: ignore[attr-defined]
+        self.transmit()  # type: ignore[attr-defined]
 
     async def receive_data(self, timeout: float | None = None) -> bytes:
         """Receive data from WebTransport stream.
@@ -116,7 +126,7 @@ class WebTransportClientProtocol(QuicConnectionProtocol):
         return await self._receive_queue.get()
 
 
-class WebTransportServerProtocol(QuicConnectionProtocol):
+class WebTransportServerProtocol(QuicConnectionProtocol):  # type: ignore[misc,valid-type]
     """QUIC server protocol for WebTransport."""
 
     def __init__(self, *args: Any, handler: Any = None, **kwargs: Any) -> None:
@@ -132,10 +142,10 @@ class WebTransportServerProtocol(QuicConnectionProtocol):
             event: QUIC event from the connection
         """
         if self._http is None:
-            self._http = H3Connection(self._quic, enable_webtransport=True)
+            self._http = H3Connection(self._quic, enable_webtransport=True)  # type: ignore[attr-defined]
 
         # Process through H3
-        for h3_event in self._http.handle_event(event):
+        for h3_event in self._http.handle_event(event):  # type: ignore[attr-defined]
             self._h3_event_received(h3_event)
 
     def _h3_event_received(self, event: H3Event) -> None:
@@ -150,14 +160,14 @@ class WebTransportServerProtocol(QuicConnectionProtocol):
 
             # Accept the WebTransport session
             if self._http:
-                self._http.send_headers(
+                self._http.send_headers(  # type: ignore[attr-defined]
                     stream_id=event.stream_id,
                     headers=[
                         (b":status", b"200"),
                         (b"sec-webtransport-http3-draft", b"draft02"),
                     ],
                 )
-                self.transmit()
+                self.transmit()  # type: ignore[attr-defined]
 
             # Create queue for this session
             self._sessions[event.stream_id] = asyncio.Queue()
@@ -186,8 +196,8 @@ class WebTransportServerProtocol(QuicConnectionProtocol):
             data: Data to send
         """
         if self._http:
-            self._http._quic.send_stream_data(stream_id, data, end_stream=False)
-            self.transmit()
+            self._http._quic.send_stream_data(stream_id, data, end_stream=False)  # type: ignore[attr-defined]
+            self.transmit()  # type: ignore[attr-defined]
 
     async def receive_data(self, stream_id: int, timeout: float | None = None) -> bytes:
         """Receive data from a WebTransport stream.
