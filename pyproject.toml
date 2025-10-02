@@ -1,6 +1,6 @@
 [project]
 name = "py-capnweb"
-version = "0.3.1"
+version = "0.4.0"
 description = "Python implementation of the Cap'n Web protocol"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,6 +28,8 @@ dependencies = [
     "typing-extensions>=4.9.0",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
+    "pytest-asyncio>=1.2.0",
+    "cryptography>=46.0.2",
 ]
 
 [project.urls]
@@ -100,7 +102,10 @@ dev = [
     "honcho>=2.0.0",
     "nox>=2025.5.1",
     "pyrefly>=0.35.0",
+    "pytest-asyncio>=1.2.0",
     "pyupgrade>=3.20.0",
+    "ruff>=0.13.2",
     "ty>=0.0.1a21",
     "uv-build>=0.8.22",
+    "vulture>=2.14",
 ]
