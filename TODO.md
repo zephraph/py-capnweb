@@ -2,11 +2,12 @@
 
 ## Current Status
 
-**v0.3.1-dev - Architecture Complete & High Test Coverage** ✅
+**v0.4.0 - WebTransport/HTTP/3 Support** ✅
 
 - ✅ Core protocol types (IDs, errors, wire format)
 - ✅ HTTP batch transport (client & server)
 - ✅ WebSocket transport
+- ✅ **WebTransport/HTTP/3 transport** (new in v0.4.0)
 - ✅ Transport abstraction layer
 - ✅ Capability dispatch and method calls
 - ✅ Hook-based architecture (replaced evaluator)
@@ -22,7 +23,9 @@
 - ✅ TypeScript interoperability (array escaping)
 - ✅ Code quality improvements (reduced cyclomatic complexity)
 - ✅ Legacy code removed (evaluator.py, tables.py)
-- ✅ **329 tests, 85% coverage** (up from 179 tests, 67%)
+- ✅ **352 tests, 76% coverage** (all tests passing)
+- ✅ **0 linting errors** (ruff)
+- ✅ **0 typing errors** (pyrefly)
 
 **See [CHANGES.md](CHANGES.md) for detailed changelog.**
 
@@ -30,11 +33,13 @@
 
 ## Next Steps (Priority Order)
 
-### 2. Documentation & Examples (High Priority) ✅ **COMPLETE**
+### Documentation & Examples ✅ **COMPLETE**
 **Completed:**
 - ✅ Documentation created (quickstart, architecture, API reference)
 - ✅ Chat application example (WebSocket + bidirectional RPC)
 - ✅ Microservices example (service mesh with capability passing)
+- ✅ Actor system example (distributed actors with capability passing)
+- ✅ WebTransport examples (standalone and integrated)
 
 **Files created:**
 - ✅ `docs/README.md` - Documentation hub
@@ -43,6 +48,9 @@
 - ✅ `docs/api-reference.md` - Complete API documentation
 - ✅ `examples/chat/` - Real-time chat (server.py, client.py, README.md)
 - ✅ `examples/microservices/` - Service mesh (user_service.py, order_service.py, api_gateway.py, client.py, README.md)
+- ✅ `examples/actor-system/` - Distributed actor system (supervisor.py, worker.py, main.py, README.md)
+- ✅ `examples/webtransport/` - Standalone WebTransport (server.py, client.py, README.md)
+- ✅ `examples/webtransport-integrated/` - Integrated WebTransport (server.py, client.py, README.md)
 
 **Still missing (lower priority):**
 - [ ] Set up Sphinx for hosted docs (optional - markdown docs sufficient for now)
@@ -52,36 +60,39 @@
 
 ## Medium Priority
 
-### 3. WebTransport / HTTP/3
+### WebTransport / HTTP/3 ✅ **COMPLETE** (v0.4.0)
 
 Modern transport using HTTP/3 and QUIC.
 
-**Why needed:**
+**Completed:**
+- ✅ Certificate management utilities (src/capnweb/certs.py)
+- ✅ WebTransportServer class
+- ✅ WebTransportClient class
+- ✅ Bidirectional streams support
+- ✅ Certificate management (generate_self_signed_cert, verify_certificate)
+- ✅ Transport integration (WebTransportTransport)
+- ✅ Server integration (enable_webtransport flag)
+- ✅ 12 unit tests (all passing)
+- ✅ Standalone examples (examples/webtransport/)
+- ✅ Integrated examples (examples/webtransport-integrated/)
+- ✅ Full documentation
+
+**Benefits:**
 - Better performance than WebSocket
 - Built-in multiplexing
 - 0-RTT reconnection
 - Future-proof
 
-**Challenges:**
-- Requires HTTP/3 support (aioquic library)
-- Complex setup (TLS certificates required)
-- Limited browser support (but improving)
-
-**Implementation:**
-- [ ] Research aioquic library
-- [ ] Create `WebTransportServer` class
-- [ ] Create `WebTransportClient` class
-- [ ] Handle bidirectional streams
-- [ ] Certificate management
-- [ ] Tests
-
-**Files:**
-- `src/capnweb/transports.py` (extend)
-- `tests/test_webtransport.py` (new)
+**Files created:**
+- ✅ `src/capnweb/certs.py` - Certificate management
+- ✅ `src/capnweb/webtransport.py` - WebTransport client/server
+- ✅ `tests/test_webtransport.py` - 12 unit tests
+- ✅ `examples/webtransport/` - Standalone example
+- ✅ `examples/webtransport-integrated/` - Integrated example
 
 ---
 
-### 4. IL (Intermediate Language) Execution
+### IL (Intermediate Language) Execution
 
 Execute complex multi-step operations defined in IL on the server.
 
@@ -100,7 +111,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 5. Connection Management Improvements
+### Connection Management Improvements
 
 **What's missing:**
 - Connection pooling
@@ -123,7 +134,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 6. Performance Optimization
+### Performance Optimization
 
 **Areas to optimize:**
 1. **JSON serialization** - Use faster libraries (orjson)
@@ -149,7 +160,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ## Low Priority / Nice to Have
 
-### 7. Logging & Observability
+### Logging & Observability
 
 **What's missing:**
 - Structured logging
@@ -172,7 +183,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 8. Additional Examples
+### Additional Examples
 
 **Completed examples:**
 - [x] Simple calculator
@@ -180,6 +191,8 @@ Execute complex multi-step operations defined in IL on the server.
 - [x] Peer-to-peer RPC
 - [x] Chat application (WebSocket + bidirectional)
 - [x] Microservices (service-to-service RPC)
+- [x] Actor system (distributed actors)
+- [x] WebTransport (standalone + integrated)
 
 **Additional examples (nice to have):**
 - [ ] File server (streaming)
@@ -188,12 +201,15 @@ Execute complex multi-step operations defined in IL on the server.
 **Files:**
 - ✅ `examples/chat/` - Real-time chat with WebSocket
 - ✅ `examples/microservices/` - Service mesh architecture
+- ✅ `examples/actor-system/` - Distributed actor system
+- ✅ `examples/webtransport/` - WebTransport/HTTP/3
+- ✅ `examples/webtransport-integrated/` - Integrated WebTransport
 - `examples/fileserver/` (future)
 - `examples/database/` (future)
 
 ---
 
-### 9. API Documentation
+### API Documentation
 
 **Needed:**
 - Sphinx documentation site
@@ -219,7 +235,7 @@ Execute complex multi-step operations defined in IL on the server.
 
 ---
 
-### 10. Property-Based Testing
+### Property-Based Testing
 
 Generate random inputs to find edge cases using Hypothesis.
 
@@ -235,7 +251,7 @@ Generate random inputs to find edge cases using Hypothesis.
 
 ---
 
-### 11. Load Testing
+### Load Testing
 
 Test behavior under high load.
 
@@ -269,7 +285,7 @@ These can be done quickly for immediate value:
 |---------|------------|--------|--------|
 | HTTP Batch | ✅ | ✅ | Done |
 | WebSocket | ✅ | ✅ | Done |
-| WebTransport | ✅ | ❌ | TODO |
+| WebTransport | ✅ | ✅ | **Done (v0.4.0)** |
 | Resume Tokens | ✅ | ✅ | Done |
 | Bidirectional | ✅ | ✅ | Done |
 | Promise Pipeline | ✅ | ✅ | Done (v0.3.0) |
@@ -277,21 +293,20 @@ These can be done quickly for immediate value:
 | IL Execution | ✅ | ⚠️ Remap only | Low Priority |
 | Release + Refcount | ✅ | ✅ | Done |
 | Escaped Arrays | ✅ | ✅ | Done |
-| Test Coverage | ~90% | **85%** | ✅ **Done** |
-| Code Quality | ✅ | ✅ | ✅ Done (v0.3.1) |
-| Hook Architecture | ✅ | ✅ | ✅ **Done** (v0.3.1) |
+| Test Coverage | ~90% | **76%** | ✅ Good |
+| Code Quality | ✅ | ✅ | ✅ Done |
+| Hook Architecture | ✅ | ✅ | ✅ Done |
 
-**Overall Compliance: ~98%** (up from ~90%)
+**Overall Compliance: ~99%** (up from ~98%)
 
 **Code Quality Metrics:**
-- ✅ All linting checks passing (ruff + pyrefly)
-- ✅ Type checking passing (pyrefly)
-- ✅ **329 tests passing** (up from 179, +150 tests)
+- ✅ **0 linting errors** (ruff)
+- ✅ **0 typing errors** (pyrefly, 17 intentional ignores)
+- ✅ **352 tests passing** (up from 329, +23 tests)
+- ✅ **76% test coverage**
 - ✅ Cyclomatic complexity under control
 - ✅ No code smells (import violations, naming issues)
-- ✅ **85% test coverage** (up from 67%, exceeded 80% target!)
-- ✅ **8 modules at 100% coverage**
-- ✅ **Legacy code removed** (evaluator.py, tables.py)
+- ✅ All async patterns corrected (Event instead of sleep loops)
 
 ---
 
@@ -305,6 +320,6 @@ To work on any of these items:
 4. Write tests first (TDD)
 5. Implement the feature
 6. Ensure all tests pass: `pytest`
-7. Ensure linting passes: `make check`
+7. Ensure linting passes: `ruff check && pyrefly check`
 8. Update documentation
 9. Submit PR

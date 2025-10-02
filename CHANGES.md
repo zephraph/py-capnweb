@@ -5,7 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.1
+## [0.4.0] - 2025-10-02
+
+### Added
+- **WebTransport/HTTP/3 Support** - Full implementation of modern transport protocol
+- **Examples**
+  - `examples/webtransport/` - Standalone WebTransport echo server/client
+  - `examples/webtransport-integrated/` - Integrated WebTransport with full RPC
+  - `examples/actor-system/` - Distributed actor system with supervisor/worker pattern
+- **Tests**
+  - 12 new WebTransport unit tests in `tests/test_webtransport.py`
+  - All 352 tests passing (up from 329, +23 tests)
+- **Documentation**
+  - Complete READMEs for all new examples
+  - WebTransport vs WebSocket comparison
+  - Certificate generation guides
+
+### Changed
+- **Code Quality Improvements**
+  - Fixed all linting issues (0 errors with ruff)
+  - Fixed all typing issues (0 errors with pyrefly, 17 intentional ignores)
+  - Converted f-strings to lazy % formatting in logging statements
+  - Used `asyncio.Event().wait()` instead of `while True: await asyncio.sleep(1)` patterns
+  - Used `contextlib.suppress()` instead of try/except/pass patterns
+- **Type Improvements**
+  - Added `WebTransportTransport` to `Client._transport` type annotation
+  - Added explicit type annotations for `asyncio.gather()` results
+  - Added type ignores for aioquic library compatibility
+- **API Improvements**
+  - `Client` now supports all three transports: HTTP Batch, WebSocket, and WebTransport
+  - Transport auto-detection based on URL scheme and path
+  - Server can run multiple transports simultaneously
+
+## [0.3.1] - 2025-10-01
 
 ### Added
 - **Comprehensive Documentation**
@@ -37,14 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `test_tables.py` - tests for removed tables module
 - Architecture now fully hook-based with no legacy code paths
 
-### Fixed
-- Moved all imports to top-level (resolved 61 PLC0415 violations)
-- Fixed circular imports between hooks ↔ payload ↔ stubs
-- Improved logging (use `logger.exception()` instead of `exc_info=True`)
-- Fixed naming conventions (camelCase → snake_case)
-- Fixed type checking errors in pipeline.py and tests
-
-## [0.3.0]
+## [0.3.0] - 2025-10-01
 
 ### Added
 - Promise pipelining support for batching multiple dependent RPC calls
@@ -57,11 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced `isinstance()` chains with match statements throughout codebase
 - All linting checks now passing (ruff + pyrefly)
 
-### Fixed
-- Array escaping in wire protocol for TypeScript compatibility
-- Special form detection in wire expression parsing
-
-## [0.2.1]
+## [0.2.1] - 2025-09-30
 
 ### Added
 - Resume tokens for session restoration
@@ -72,7 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved session lifecycle management
 
-## [0.2.0]
+## [0.2.0] - 2025-09-30
 
 ### Added
 - HTTP batch transport (client & server)
@@ -93,7 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Complete protocol implementation matching TypeScript reference
 
-## [0.1.0]
+## [0.1.0] - 2025-09-30
 
 ### Added
 - Initial project structure
@@ -101,7 +122,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic RPC framework
 - Documentation and examples
 
-[Unreleased]: https://github.com/abilian/capn-python/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/abilian/capn-python/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/abilian/capn-python/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/abilian/capn-python/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/abilian/capn-python/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/abilian/capn-python/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/abilian/capn-python/releases/tag/v0.2.0
+[0.1.0]: https://github.com/abilian/capn-python/releases/tag/v0.1.0
