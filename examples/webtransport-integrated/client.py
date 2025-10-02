@@ -51,7 +51,7 @@ async def main() -> None:
                 client.call(0, "subtract", [200, 75]),
                 client.call(0, "multiply", [25, 4]),
             ]
-            results = await asyncio.gather(*tasks)
+            results: list[int] = list(await asyncio.gather(*tasks))  # type: ignore[arg-type]
             print(f"   100 + 50 = {results[0]}")
             print(f"   200 - 75 = {results[1]}")
             print(f"   25 × 4 = {results[2]}")

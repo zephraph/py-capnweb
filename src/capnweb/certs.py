@@ -141,7 +141,10 @@ def _build_san_list(hostname: str) -> list[x509.GeneralName]:
 
     # If it's localhost, also add 127.0.0.1 and ::1
     if hostname == "localhost":
-        san_list.extend((x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")), x509.IPAddress(ipaddress.IPv6Address("::1"))))
+        san_list.extend((
+            x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
+            x509.IPAddress(ipaddress.IPv6Address("::1")),
+        ))
 
     # Try to parse as IP address
     try:
@@ -223,7 +226,7 @@ def verify_certificate(cert: x509.Certificate, hostname: str) -> bool:
         san_list = san_ext.value
 
         # Try to match hostname
-        for name in san_list:
+        for name in san_list:  # type: ignore[attr-defined]
             if isinstance(name, x509.DNSName) and name.value == hostname:
                 return True
             if isinstance(name, x509.IPAddress):

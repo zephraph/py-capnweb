@@ -10,7 +10,7 @@ Run:
 import asyncio
 from typing import Any
 
-from worker import Worker
+from worker import Worker  # type: ignore[import-not-found]
 
 from capnweb.error import RpcError
 from capnweb.hooks import TargetStubHook

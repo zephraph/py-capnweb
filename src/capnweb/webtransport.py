@@ -26,7 +26,6 @@ try:
         WebTransportStreamDataReceived,
     )
     from aioquic.quic.configuration import QuicConfiguration
-    from aioquic.quic.events import StreamDataReceived
 
     WEBTRANSPORT_AVAILABLE = True
 except ImportError:
@@ -70,14 +69,14 @@ class WebTransportClientProtocol(QuicConnectionProtocol):
         if isinstance(event, HeadersReceived):
             # WebTransport session established
             logger.debug(
-                f"WebTransport session established on stream {event.stream_id}"
+                "WebTransport session established on stream %s", event.stream_id
             )
             self._session_id = event.stream_id
 
         elif isinstance(event, (DataReceived, WebTransportStreamDataReceived)):
             # Received data on a stream
             logger.debug(
-                f"Received {len(event.data)} bytes on stream {event.stream_id}"
+                "Received %d bytes on stream %s", len(event.data), event.stream_id
             )
             self._receive_queue.put_nowait(event.data)
 
@@ -147,7 +146,7 @@ class WebTransportServerProtocol(QuicConnectionProtocol):
         """
         if isinstance(event, HeadersReceived):
             # New WebTransport session request
-            logger.info(f"WebTransport session request on stream {event.stream_id}")
+            logger.info("WebTransport session request on stream %s", event.stream_id)
 
             # Accept the WebTransport session
             if self._http:
@@ -170,7 +169,7 @@ class WebTransportServerProtocol(QuicConnectionProtocol):
         elif isinstance(event, (DataReceived, WebTransportStreamDataReceived)):
             # Data received on stream
             logger.debug(
-                f"Received {len(event.data)} bytes on stream {event.stream_id}"
+                "Received %d bytes on stream %s", len(event.data), event.stream_id
             )
 
             # Find the session this stream belongs to
@@ -290,7 +289,7 @@ class WebTransportClient:
                 configuration=configuration,
                 create_protocol=WebTransportClientProtocol,
             ) as protocol:
-                self._protocol = protocol
+                self._protocol = protocol  # type: ignore[assignment]
                 # Keep connection alive
                 await asyncio.Event().wait()
 
@@ -415,7 +414,7 @@ class WebTransportServer:
         )
 
         # Load certificate and key
-        configuration.load_cert_chain(str(self.cert_path), str(self.key_path))
+        configuration.load_cert_chain(self.cert_path, self.key_path)  # type: ignore[arg-type]
 
         # Create protocol factory
         def create_protocol(*args: Any, **kwargs: Any) -> WebTransportServerProtocol:

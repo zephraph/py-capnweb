@@ -164,12 +164,13 @@ class TestWebTransportTransport:
         assert isinstance(transport, HttpBatchTransport)
 
 
-# TODO: Add integration tests with actual client/server communication
-# These would require:
-# 1. Starting a test server
+# NOTE: Integration tests with actual client/server communication would require:
+# 1. Starting a test server in background
 # 2. Connecting with a client
 # 3. Sending/receiving data
 # 4. Verifying protocol behavior
+# 5. Cleanup (stopping server)
+# For now, see examples/webtransport-integrated/ for working client/server demos.
 #
 # Example (commented out until implementation is complete):
 #

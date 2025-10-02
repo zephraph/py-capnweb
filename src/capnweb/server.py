@@ -656,10 +656,11 @@ class Server(RpcSession):
                     break
 
                 # Process messages
-                responses = []
+                responses: list[WireMessage] = []
                 for msg in messages:
                     response = await self._process_message(msg)
-                    responses.append(response)
+                    if response is not None:
+                        responses.append(response)
 
                 # Send responses
                 response_data = serialize_wire_batch(responses).encode("utf-8")
@@ -672,7 +673,6 @@ class Server(RpcSession):
             # Send error and close
             error = WireAbort(f"Server error: {e}")
             error_data = serialize_wire_batch([error]).encode("utf-8")
-            try:
+            with contextlib.suppress(Exception):
+                # Best effort - ignore if sending error fails
                 await protocol.send_data(stream_id, error_data)
-            except Exception:
-                pass  # Best effort

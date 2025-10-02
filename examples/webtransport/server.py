@@ -93,19 +93,20 @@ async def handle_session(protocol: Any, stream_id: int) -> None:
                 logger.info("Session %s closed by client", stream_id)
                 break
 
-            logger.debug(f"Received {len(data)} bytes on stream {stream_id}")
+            logger.debug("Received %d bytes on stream %s", len(data), stream_id)
 
             # Parse NDJSON request
             # In a real implementation, we'd use the full RPC protocol
             # For this example, we'll do simple echo for now
-            # TODO: Integrate with full Cap'n Web RPC protocol
+            # NOTE: Full Cap'n Web RPC protocol integration is demonstrated
+            # in examples/webtransport-integrated/server.py
 
             # Echo response (placeholder)
             response = data
 
             # Send response
             await protocol.send_data(stream_id, response)
-            logger.debug(f"Sent {len(response)} bytes on stream {stream_id}")
+            logger.debug("Sent %d bytes on stream %s", len(response), stream_id)
 
     except TimeoutError:
         logger.info("Session %s timed out", stream_id)

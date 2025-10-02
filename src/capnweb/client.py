@@ -15,7 +15,12 @@ from capnweb.pipeline import PendingCall, PipelineBatch, PipelinePromise
 from capnweb.resume import ResumeToken  # noqa: TC001
 from capnweb.session import RpcSession
 from capnweb.stubs import RpcStub
-from capnweb.transports import HttpBatchTransport, WebSocketTransport, create_transport
+from capnweb.transports import (
+    HttpBatchTransport,
+    WebSocketTransport,
+    WebTransportTransport,
+    create_transport,
+)
 from capnweb.wire import (
     PropertyKey,
     WireAbort,
@@ -53,7 +58,9 @@ class Client(RpcSession):
     def __init__(self, config: ClientConfig) -> None:
         super().__init__()
         self.config = config
-        self._transport: HttpBatchTransport | WebSocketTransport | None = None
+        self._transport: (
+            HttpBatchTransport | WebSocketTransport | WebTransportTransport | None
+        ) = None
         self._import_ref_counts: dict[int, int] = {}
 
     async def __aenter__(self) -> Self:

@@ -104,9 +104,8 @@ async def main() -> None:
     print("   (Press Ctrl+C to stop)")
 
     try:
-        # Keep running forever
-        while True:
-            await asyncio.sleep(1)
+        # Keep running forever - wait on event that never gets set
+        await asyncio.Event().wait()
     except KeyboardInterrupt:
         print("\n👋 Bob shutting down...")
         await server.stop()

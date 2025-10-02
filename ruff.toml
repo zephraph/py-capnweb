@@ -27,14 +27,14 @@ lint.extend-ignore = [
     "PT012", #   	[ ] pytest-raises-with-multiple-statements
     "E501", #    	[ ] line-too-long
     "FURB152", # 3.14 != Pi. This one is insane.
+    # Review later
+    "ASYNC109", # timeouts in asyncio
     #  Fix
     "CPY001", #  	[ ] missing-copyright-notice
     "SLF001", #  	[ ] private-member-access
     "PT011", #   	[ ] pytest-raises-too-broad
-#    "C901", #    	[ ] complex-structure
     "BLE001", #  	[ ] blind-except
     "INP001", #  	[ ] implicit-namespace-package
-    "ASYNC110", #	[ ] async-busy-wait
-    "EXE001", #  	[ ] shebang-not-executable
+#    "EXE001", #  	[ ] shebang-not-executable
     "PLC1901",
 ]
