@@ -89,7 +89,7 @@ async def run_tests(client: Client) -> dict[str, Any]:
         raise AssertionError(msg)
     except Exception as e:
         results["errorNotFound"] = str(e)
-        if "not found" not in str(e).lower():  # noqa: PT017
+        if "not found" not in str(e).lower():
             msg = f"Wrong error: {e}"
             raise AssertionError(msg) from e
 
@@ -100,7 +100,7 @@ async def run_tests(client: Client) -> dict[str, Any]:
         raise AssertionError(msg)
     except Exception as e:
         results["errorBadRequest"] = str(e)
-        if "invalid" not in str(e).lower() and "bad" not in str(e).lower():  # noqa: PT017
+        if "invalid" not in str(e).lower() and "bad" not in str(e).lower():
             msg = f"Wrong error: {e}"
             raise AssertionError(msg) from e
 

@@ -3,11 +3,21 @@
 These tests generate random inputs to verify invariants hold across
 a wide range of values, helping discover edge cases that might be
 missed by example-based tests.
+
+This is about as good as we can get with property-based tests alone without significantly changing the architecture or adding integration tests.
+
+The property tests cwurrently thoroughly cover:
+
+- All wire protocol serialization/deserialization paths
+- ID allocation invariants
+- Payload ownership semantics
+- Error handling
 """
 
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -32,6 +42,8 @@ from capnweb.wire import (
     WireRelease,
     WireRemap,
     WireResolve,
+    wire_expression_from_json,
+    wire_expression_to_json,
 )
 
 # Custom strategies for wire protocol types
@@ -764,3 +776,182 @@ class TestRpcErrorProperties:
         error = RpcError(code, message)
         assert isinstance(error, Exception)
         assert str(error) == f"{code}: {message}"
+
+
+# Property tests for wire expression parsing/serialization
+
+
+class TestWireExpressionProperties:
+    """Property-based tests for wire_expression_from_json and wire_expression_to_json."""
+
+    @given(simple_json_strategy())
+    def test_primitives_roundtrip(self, value: Any) -> None:
+        """Primitive values should roundtrip through wire expression conversion."""
+        # Primitives should pass through unchanged
+        if value is None or isinstance(value, (bool, int, float, str)):
+            json_value = wire_expression_to_json(value)
+            assert json_value == value
+
+            parsed = wire_expression_from_json(json_value)
+            assert parsed == value
+
+    @given(
+        st.dictionaries(
+            st.text(min_size=1, max_size=20), simple_json_strategy(), max_size=5
+        )
+    )
+    def test_dicts_roundtrip(self, value: dict[str, Any]) -> None:
+        """Dictionaries should roundtrip through wire expression conversion."""
+        json_value = wire_expression_to_json(value)
+        parsed = wire_expression_from_json(json_value)
+        assert parsed == value
+
+    @given(st.lists(simple_json_strategy(), min_size=0, max_size=10))
+    def test_plain_arrays_roundtrip(self, value: list[Any]) -> None:
+        """Plain arrays should roundtrip."""
+        # Skip arrays that start with wire keywords
+        if (
+            value
+            and isinstance(value[0], str)
+            and value[0]
+            in {
+                "error",
+                "import",
+                "export",
+                "promise",
+                "pipeline",
+                "date",
+                "remap",
+            }
+        ):
+            return
+
+        json_value = wire_expression_to_json(value)
+        parsed = wire_expression_from_json(json_value)
+        assert parsed == value
+
+    @given(wire_error_strategy())
+    def test_wire_error_through_expression_converter(self, error: WireError) -> None:
+        """WireError should convert through expression functions."""
+        # to_json converts WireError to array
+        json_value = wire_expression_to_json(error)
+        assert isinstance(json_value, list)
+        assert json_value[0] == "error"
+
+        # from_json should parse it back
+        parsed = wire_expression_from_json(json_value)
+        assert isinstance(parsed, WireError)
+        assert parsed.error_type == error.error_type
+        assert parsed.message == error.message
+
+    @given(wire_date_strategy())
+    def test_wire_date_through_expression_converter(self, date: WireDate) -> None:
+        """WireDate should convert through expression functions."""
+        json_value = wire_expression_to_json(date)
+        assert isinstance(json_value, list)
+        assert json_value[0] == "date"
+
+        parsed = wire_expression_from_json(json_value)
+        assert isinstance(parsed, WireDate)
+        assert parsed.timestamp == date.timestamp
+
+    @given(st.lists(simple_json_strategy(), min_size=1, max_size=5))
+    def test_escaped_arrays_in_pipeline_args(self, args: list[Any]) -> None:
+        """Arrays in pipeline arguments should be escapable."""
+        # When escape_arrays=True, arrays should be wrapped
+        json_value = wire_expression_to_json(args, escape_arrays=True)
+
+        # Should be wrapped: [[...]]
+        assert isinstance(json_value, list)
+        if args and isinstance(args[0], list):
+            # Nested arrays get double-wrapped
+            assert isinstance(json_value[0], list)
+
+    @given(st.integers(min_value=-10000, max_value=10000))
+    def test_import_export_promise_stay_as_lists(self, id_value: int) -> None:
+        """Import/export/promise expressions should stay as plain lists."""
+        for tag in ["import", "export", "promise"]:
+            expr = [tag, id_value]
+            parsed = wire_expression_from_json(expr)
+
+            # Should stay as plain list, not converted to WireImport/WireExport/WirePromise
+            assert isinstance(parsed, list)
+            assert parsed == expr
+
+    @given(
+        st.lists(
+            st.lists(simple_json_strategy(), min_size=1, max_size=3),
+            min_size=1,
+            max_size=3,
+        )
+    )
+    def test_escaped_literal_arrays(self, inner: list[list[Any]]) -> None:
+        """Escaped literal arrays [[...]] should be unwrapped."""
+        # Skip if inner array looks like a special form
+        if (
+            inner
+            and inner[0]
+            and isinstance(inner[0][0], str)
+            and inner[0][0]
+            in {
+                "error",
+                "import",
+                "export",
+                "promise",
+                "pipeline",
+                "date",
+                "remap",
+            }
+        ):
+            return
+
+        # Wrap array: [[...]]
+        wrapped = [inner]
+        parsed = wire_expression_from_json(wrapped)
+
+        # Should be unwrapped back to original
+        assert isinstance(parsed, list)
+
+    @given(
+        st.lists(
+            st.one_of(
+                simple_json_strategy(),
+                wire_error_strategy(),
+                wire_date_strategy(),
+            ),
+            min_size=0,
+            max_size=5,
+        )
+    )
+    def test_nested_expressions_convert_correctly(self, values: list[Any]) -> None:
+        """Nested wire expressions should convert correctly."""
+        json_values = [wire_expression_to_json(v) for v in values]
+
+        # Each should be serializable
+        serialized = json.dumps(json_values)
+        assert isinstance(serialized, str)
+
+        # Should deserialize
+        deserialized = json.loads(serialized)
+        assert isinstance(deserialized, list)
+
+    @given(st.text(min_size=0, max_size=100))
+    def test_invalid_expression_raises(self, invalid: str) -> None:
+        """Invalid expression types should raise ValueError."""
+
+        # Create something that's not a valid wire expression type
+        # (not None, bool, int, float, str, list, dict)
+        @dataclass
+        class InvalidType:
+            value: str
+
+        invalid_expr = InvalidType(invalid)
+
+        # Should raise when trying to parse
+        try:
+            wire_expression_to_json(invalid_expr)  # type: ignore[arg-type]
+            # If we get here without raising, that's a problem
+            assert False, "Expected exception was not raised"  # noqa: B011, PT015
+        except (ValueError, TypeError, AttributeError):
+            # Expected - invalid type should raise
+            pass

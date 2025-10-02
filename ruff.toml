@@ -14,8 +14,6 @@ lint.extend-ignore = [
     "ARG",
     "FBT",
     "ERA",
-    "RUF",
-    "S",
     "A",
     # False positives
     "COM812", #  	[*] missing-trailing-comma
@@ -27,6 +25,8 @@ lint.extend-ignore = [
     "PT012", #   	[ ] pytest-raises-with-multiple-statements
     "E501", #    	[ ] line-too-long
     "FURB152", # 3.14 != Pi. This one is insane.
+    "RUF005", # Confusing syntax
+    "S101", # use of assert
     # Review later
     "ASYNC109", # timeouts in asyncio
     #  Fix
@@ -36,4 +36,10 @@ lint.extend-ignore = [
     "BLE001", #  	[ ] blind-except
     "INP001", #  	[ ] implicit-namespace-package
     "PLC1901",
+    "RUF006", # asyncio-dangling-task
+    "RUF001", # ambiguous-unicode-character-string
+    "RUF034", # useless-if-else
+    "RUF022", # unsorted-dunder-all
+    "RUF029", # unused-async
+    "RUF036", # none-not-at-end-of-union
 ]

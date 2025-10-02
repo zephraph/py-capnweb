@@ -203,8 +203,8 @@ class Server(RpcSession):
         if self._site is None:
             return self.config.port
         # Get the first server socket from the site
-        if self._site._server:  # noqa: SLF001
-            return self._site._server.sockets[0].getsockname()[1]  # noqa: SLF001  # type: ignore[union-attr]
+        if self._site._server:
+            return self._site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
         return self.config.port
 
     async def start(self) -> None:

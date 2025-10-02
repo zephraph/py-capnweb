@@ -13,7 +13,7 @@ from capnweb.client import Client, ClientConfig
 from capnweb.hooks import RpcImportHook
 
 
-async def main() -> None:  # noqa: C901
+async def main() -> None:
     """Main application logic that uses the distributed actor system."""
     print("--- Distributed Actor System Demo ---")
     supervisor_url = "http://localhost:8080/rpc/batch"

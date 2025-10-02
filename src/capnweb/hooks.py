@@ -283,7 +283,7 @@ class TargetStubHook(StubHook):
             try:
                 prop_value = await current_obj.get_property(str(prop))
                 current_obj = prop_value
-            except Exception as e:  # noqa: PERF203
+            except Exception as e:
                 if isinstance(e, RpcError):
                     raise
                 msg = f"Property navigation failed at path {property_path}: {e}"
@@ -565,7 +565,7 @@ class PromiseStubHook(StubHook):
             try:
                 result = self.future.result()
                 result.dispose()
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
 
     def dup(self) -> Self:

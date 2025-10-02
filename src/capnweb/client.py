@@ -67,7 +67,7 @@ class Client(RpcSession):
         """Async context manager entry."""
         self._transport = create_transport(self.config.url, timeout=self.config.timeout)
         # Manually manage transport lifecycle - we're composing context managers
-        await self._transport.__aenter__()  # noqa: PLC2801
+        await self._transport.__aenter__()
         return self
 
     async def __aexit__(self, *args: object) -> None:

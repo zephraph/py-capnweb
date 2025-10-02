@@ -56,7 +56,7 @@ class UserService(RpcTarget):
                 msg = f"Method {method} not found"
                 raise RpcError.not_found(msg)
 
-    async def get_property(self, property: str) -> Any:  # noqa: ARG002
+    async def get_property(self, property: str) -> Any:
         msg = "Property access not implemented"
         raise RpcError.not_found(msg)
 

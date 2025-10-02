@@ -292,16 +292,11 @@ def wire_expression_from_json(value: Any) -> WireExpression:  # noqa: C901
             if inner and isinstance(inner[0], str):
                 tag = inner[0]
                 if (
-                    tag == "error"
-                    and len(inner) >= 3
-                    or tag in {"import", "export", "promise"}
-                    and len(inner) == 2
-                    or tag == "pipeline"
-                    and len(inner) >= 2
-                    or tag == "date"
-                    and len(inner) == 2
-                    or tag == "remap"
-                    and len(inner) == 5
+                    (tag == "error" and len(inner) >= 3)
+                    or (tag in {"import", "export", "promise"} and len(inner) == 2)
+                    or (tag == "pipeline" and len(inner) >= 2)
+                    or (tag == "date" and len(inner) == 2)
+                    or (tag == "remap" and len(inner) == 5)
                 ):
                     is_valid_special_form = True
 
