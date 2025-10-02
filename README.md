@@ -178,7 +178,7 @@ See [CHANGES.md](CHANGES.md) for detailed release notes.
 **v0.4.0** (latest):
 - WebTransport/HTTP/3 support with certificate management
 - Actor system example with distributed capabilities
-- Perfect code quality (0 linting errors, 0 typing errors)
+- "Perfect" code quality (0 linting errors, 0 typing errors)
 - 352 tests passing
 
 **v0.3.1**:

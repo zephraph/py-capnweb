@@ -37,21 +37,22 @@ Generate random inputs to find edge cases using Hypothesis.
 **Completed:**
 - ✅ Added Hypothesis library (v6.100.0+)
 - ✅ Property tests for wire serialization (WireError, WireImport, WireExport, WirePromise, WireDate, WireCapture, WireRemap, etc.)
+- ✅ Property tests for wire expression parsing/serialization (wire_expression_from_json, wire_expression_to_json)
 - ✅ Property tests for ID allocation (sequential, bijective conversions, local/remote checks)
 - ✅ Property tests for expression evaluation (plain arrays, error expressions, capability references)
 - ✅ Property tests for RpcPayload ownership semantics (PARAMS, RETURN, OWNED sources, deep copying)
 - ✅ Property tests for RpcError factory methods (all error codes, data preservation)
 - ✅ Fuzz testing for error paths (malformed messages, various value types)
-- ✅ 44 property-based tests covering core invariants
+- ✅ 54 property-based tests covering core invariants
 - ✅ All tests passing with 100+ examples per test
 
 **Files created:**
-- ✅ `tests/test_properties.py` - 44 property tests (766 lines)
+- ✅ `tests/test_properties.py` - 54 property tests (932 lines)
 
 **Coverage improvements from PBT:**
 - error.py: 87% → 92% (+5%)
 - payload.py: 32% → 65% (+33%)
-- wire.py: 55% → 62% (+7%)
+- wire.py: 55% → 73% (+18%)
 
 **Benefits:**
 - Discovered edge cases in wire protocol parsing
