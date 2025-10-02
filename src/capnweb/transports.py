@@ -1,14 +1,40 @@
 """Transport implementations for Cap'n Web protocol.
 
 This module provides concrete implementations of the Transport protocol
-for different communication methods (HTTP batch, WebSocket, etc.).
+for different communication methods (HTTP batch, WebSocket, WebTransport).
 """
 
 from __future__ import annotations
 
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import aiohttp
+
+if TYPE_CHECKING:
+    try:
+        from aioquic.asyncio import QuicConnectionProtocol
+        from aioquic.h3.connection import H3Connection
+        from aioquic.quic.configuration import QuicConfiguration
+
+        WEBTRANSPORT_AVAILABLE = True
+    except ImportError:
+        WEBTRANSPORT_AVAILABLE = False
+else:
+    try:
+        from aioquic.asyncio import QuicConnectionProtocol, connect
+        from aioquic.h3.connection import H3Connection
+        from aioquic.h3.events import (
+            DataReceived,
+            H3Event,
+            HeadersReceived,
+            WebTransportStreamDataReceived,
+        )
+        from aioquic.quic.configuration import QuicConfiguration
+        from aioquic.quic.events import QuicEvent
+
+        WEBTRANSPORT_AVAILABLE = True
+    except ImportError:
+        WEBTRANSPORT_AVAILABLE = False
 
 
 class HttpBatchTransport:
@@ -198,9 +224,93 @@ class WebSocketTransport:
             self._session = None
 
 
+class WebTransportTransport:
+    """WebTransport transport implementation.
+
+    Provides high-performance bidirectional streaming over HTTP/3 using QUIC.
+
+    Features:
+    - Multiplexed streams over a single QUIC connection
+    - 0-RTT reconnection support
+    - Better performance than WebSocket
+    - Built-in congestion control
+
+    Note: Requires aioquic to be installed (pip install aioquic)
+    """
+
+    def __init__(
+        self,
+        url: str,
+        cert_path: str | None = None,
+        verify_mode: bool = False,
+    ) -> None:
+        """Initialize the WebTransport transport.
+
+        Args:
+            url: The WebTransport URL (e.g., "https://localhost:4433/rpc/wt")
+            cert_path: Path to CA certificate for verification (None to skip)
+            verify_mode: Whether to verify server certificate (default: False)
+        """
+        if not WEBTRANSPORT_AVAILABLE:
+            msg = "WebTransport requires aioquic library: pip install aioquic"
+            raise RuntimeError(msg)
+
+        # Import the WebTransportClient here to avoid circular imports
+        from capnweb.webtransport import WebTransportClient
+
+        self._client = WebTransportClient(url, cert_path, verify_mode)
+
+    async def __aenter__(self) -> Self:
+        """Async context manager entry - establishes WebTransport connection."""
+        await self._client.connect()
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        """Async context manager exit - closes connection."""
+        await self.close()
+
+    async def send(self, data: bytes) -> None:
+        """Send data over WebTransport stream.
+
+        Args:
+            data: Data to send
+
+        Raises:
+            RuntimeError: If not connected
+        """
+        await self._client.send(data)
+
+    async def receive(self) -> bytes:
+        """Receive data from WebTransport stream.
+
+        Returns:
+            Received data
+
+        Raises:
+            RuntimeError: If not connected
+            ConnectionError: If connection is closed
+        """
+        return await self._client.receive()
+
+    async def send_and_receive(self, data: bytes) -> bytes:
+        """Send data and receive response.
+
+        Args:
+            data: Data to send
+
+        Returns:
+            Response data
+        """
+        return await self._client.send_and_receive(data)
+
+    async def close(self) -> None:
+        """Close the WebTransport connection."""
+        await self._client.close()
+
+
 def create_transport(
     url: str, **kwargs: Any
-) -> HttpBatchTransport | WebSocketTransport:
+) -> HttpBatchTransport | WebSocketTransport | WebTransportTransport:
     """Factory function to create appropriate transport based on URL.
 
     Args:
@@ -213,10 +323,23 @@ def create_transport(
     Examples:
         >>> transport = create_transport("http://localhost:8080/rpc/batch")
         >>> transport = create_transport("ws://localhost:8080/rpc/ws")
+        >>> transport = create_transport("https://localhost:4433/rpc/wt")
     """
     if url.startswith(("ws://", "wss://")):
         return WebSocketTransport(url)
-    if url.startswith(("http://", "https://")):
+    if url.startswith("http://"):
+        timeout = kwargs.get("timeout", 30.0)
+        return HttpBatchTransport(url, timeout=timeout)
+    if url.startswith("https://"):
+        # For HTTPS, check if it's WebTransport or HTTP batch
+        # WebTransport URLs typically have a /wt path or use port 4433
+        if "/wt" in url or ":4433" in url:
+            cert_path = kwargs.get("cert_path")
+            verify_mode = kwargs.get("verify_mode", True)
+            return WebTransportTransport(
+                url, cert_path=cert_path, verify_mode=verify_mode
+            )
+        # Otherwise, treat as HTTP batch
         timeout = kwargs.get("timeout", 30.0)
         return HttpBatchTransport(url, timeout=timeout)
     msg = f"Unsupported URL scheme: {url}"

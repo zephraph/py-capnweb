@@ -42,7 +42,9 @@ async def main() -> None:  # noqa: C901
             worker_a_id = worker_a_cap._hook.import_id
             worker_b_id = worker_b_cap._hook.import_id
 
-            print(f"  - Received capabilities for Worker-A (import ID {worker_a_id}) and Worker-B (import ID {worker_b_id}).")
+            print(
+                f"  - Received capabilities for Worker-A (import ID {worker_a_id}) and Worker-B (import ID {worker_b_id})."
+            )
 
             # === Step 2: Interact with the workers directly ===
             # The client now has direct references to the workers and does not

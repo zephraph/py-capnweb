@@ -48,6 +48,9 @@ dev = [
 interop = [
     "httpx>=0.25.0",
 ]
+webtransport = [
+    "aioquic>=1.2.0",
+]
 
 [build-system]
 requires = ["uv-build>=0.8.4,<0.9.0"]

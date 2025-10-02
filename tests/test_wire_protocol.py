@@ -170,10 +170,11 @@ class TestEscapedArrays:
         serialized = wire_expression_to_json(wire_import)
         assert serialized == ["import", 5]
 
-        # When parsed, should be a WireImport
+        # When parsed, capability expressions are left as plain lists
+        # (Parser is responsible for converting to RpcStub objects)
         parsed = wire_expression_from_json(serialized)
-        assert isinstance(parsed, WireImport)
-        assert parsed.import_id == 5
+        assert parsed == ["import", 5]
+        assert isinstance(parsed, list)
 
 
 class TestWireCapture:
@@ -233,8 +234,8 @@ class TestIntegration:
         result = wire_expression_from_json(reparsed)
 
         assert isinstance(result, dict)
-        assert isinstance(result["user"], WireImport)
-        assert result["user"].import_id == 1
+        # Capability expressions are left as plain lists
+        assert result["user"] == ["import", 1]
         assert result["action"] == "update"
         assert isinstance(result["mapper"], WireRemap)
         assert result["mapper"].import_id == 2

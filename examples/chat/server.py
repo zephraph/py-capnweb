@@ -33,7 +33,9 @@ logger = logging.getLogger(__name__)
 class ChatRoom(RpcTarget):
     """Chat room that manages multiple clients and broadcasts messages."""
 
-    clients: dict[str, RpcStub] = field(default_factory=dict)  # username -> client capability
+    clients: dict[str, RpcStub] = field(
+        default_factory=dict
+    )  # username -> client capability
     message_history: list[dict[str, str]] = field(default_factory=list)
 
     async def call(self, method: str, args: list[Any]) -> Any:

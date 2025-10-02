@@ -78,12 +78,19 @@ class ServerConfig:
     include_stack_traces: bool = False  # Security: disabled by default
     resume_token_ttl: float = 3600.0  # Resume token TTL in seconds (1 hour)
 
+    # WebTransport configuration (optional)
+    enable_webtransport: bool = False  # Enable WebTransport/HTTP/3
+    webtransport_port: int = 4433  # Port for WebTransport (default: 4433)
+    webtransport_cert_path: str | None = None  # Path to SSL certificate
+    webtransport_key_path: str | None = None  # Path to SSL private key
+
 
 class Server(RpcSession):
     """Cap'n Web server implementation.
 
-    Supports HTTP batch transport with the protocol endpoints:
+    Supports multiple transport protocols:
     - POST /rpc/batch: HTTP batch RPC
+    - WebTransport /rpc/wt: HTTP/3/QUIC RPC (optional, requires aioquic)
 
     Extends RpcSession to get unified import/export table management.
 
@@ -124,6 +131,10 @@ class Server(RpcSession):
         )
         # Track batch-local import tables for HTTP batch requests
         self._batch_imports: dict[int, StubHook] = {}
+
+        # WebTransport server (optional)
+        self._webtransport_server: Any = None
+        self._webtransport_task: asyncio.Task | None = None
 
         # Create a wrapper that exposes both dict and ExportTable API
         self._exports_wrapper = self._create_exports_wrapper()
@@ -199,8 +210,25 @@ class Server(RpcSession):
 
         print(f"Server listening on {self.config.host}:{self.port}")
 
+        # Start WebTransport server if enabled
+        if self.config.enable_webtransport:
+            await self._start_webtransport()
+
     async def stop(self) -> None:
         """Stop the server."""
+        # Stop WebTransport server if running
+        if self._webtransport_task:
+            self._webtransport_task.cancel()
+            try:
+                await self._webtransport_task
+            except asyncio.CancelledError:
+                pass
+            self._webtransport_task = None
+
+        if self._webtransport_server:
+            await self._webtransport_server.close()
+            self._webtransport_server = None
+
         if self._runner:
             await self._runner.cleanup()
 
@@ -551,3 +579,95 @@ class Server(RpcSession):
         """
         msg = "Pull from server not supported in HTTP batch mode"
         raise NotImplementedError(msg)
+
+    # WebTransport support methods
+
+    async def _start_webtransport(self) -> None:
+        """Start the WebTransport server."""
+        if (
+            not self.config.webtransport_cert_path
+            or not self.config.webtransport_key_path
+        ):
+            print("WARNING: WebTransport enabled but certificate paths not provided")
+            print("         Skipping WebTransport server startup")
+            return
+
+        try:
+            # Import WebTransport conditionally
+            from pathlib import Path
+
+            from capnweb.webtransport import WebTransportServer
+
+            # Create WebTransport server
+            self._webtransport_server = WebTransportServer(
+                host=self.config.host,
+                port=self.config.webtransport_port,
+                cert_path=Path(self.config.webtransport_cert_path),
+                key_path=Path(self.config.webtransport_key_path),
+                handler=self._handle_webtransport_session,
+            )
+
+            # Start in background task
+            async def run_webtransport() -> None:
+                await self._webtransport_server.serve()
+
+            self._webtransport_task = asyncio.create_task(run_webtransport())
+
+            print(
+                f"WebTransport server listening on https://{self.config.host}:{self.config.webtransport_port}/rpc/wt"
+            )
+
+        except ImportError:
+            print("WARNING: WebTransport requires aioquic library")
+            print("         Install with: uv pip install aioquic")
+            print("         Skipping WebTransport server startup")
+        except Exception as e:
+            print(f"ERROR: Failed to start WebTransport server: {e}")
+            raise
+
+    async def _handle_webtransport_session(self, protocol: Any, stream_id: int) -> None:
+        """Handle a WebTransport session.
+
+        Args:
+            protocol: The WebTransport protocol instance
+            stream_id: The stream ID for this session
+        """
+        try:
+            while True:
+                # Receive request data
+                data = await protocol.receive_data(stream_id, timeout=60.0)
+
+                if not data:
+                    # Client closed connection
+                    break
+
+                # Parse NDJSON batch
+                messages = parse_wire_batch(data.decode("utf-8"))
+
+                if len(messages) > self.config.max_batch_size:
+                    error = WireAbort(f"Batch size {len(messages)} exceeds maximum")
+                    response_data = serialize_wire_batch([error]).encode("utf-8")
+                    await protocol.send_data(stream_id, response_data)
+                    break
+
+                # Process messages
+                responses = []
+                for msg in messages:
+                    response = await self._process_message(msg)
+                    responses.append(response)
+
+                # Send responses
+                response_data = serialize_wire_batch(responses).encode("utf-8")
+                await protocol.send_data(stream_id, response_data)
+
+        except TimeoutError:
+            # Session timed out
+            pass
+        except Exception as e:
+            # Send error and close
+            error = WireAbort(f"Server error: {e}")
+            error_data = serialize_wire_batch([error]).encode("utf-8")
+            try:
+                await protocol.send_data(stream_id, error_data)
+            except Exception:
+                pass  # Best effort
