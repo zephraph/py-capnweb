@@ -2,38 +2,12 @@
 
 ## Current Status
 
-**v0.4.0 - WebTransport/HTTP/3 Support** ✅
-
-- ✅ Core protocol types (IDs, errors, wire format)
-- ✅ HTTP batch transport (client & server)
-- ✅ WebSocket transport
-- ✅ **WebTransport/HTTP/3 transport** (new in v0.4.0)
-- ✅ Transport abstraction layer
-- ✅ Capability dispatch and method calls
-- ✅ Hook-based architecture (replaced evaluator)
-- ✅ Remap expressions (`.map()` operations)
-- ✅ Release with refcount
-- ✅ Escaped literal arrays
-- ✅ Promise resolution
-- ✅ Error handling with custom data fields
-- ✅ Security: Stack trace redaction
-- ✅ Bidirectional RPC (peer-to-peer)
-- ✅ Resume tokens for session restoration
-- ✅ Promise pipelining (batching calls)
-- ✅ TypeScript interoperability (array escaping)
-- ✅ Code quality improvements (reduced cyclomatic complexity)
-- ✅ Legacy code removed (evaluator.py, tables.py)
-- ✅ **384 tests, 73% coverage** (all tests passing, +44 property tests)
-- ✅ **0 linting errors** (ruff)
-- ✅ **0 typing errors** (pyrefly)
-
 **See [CHANGES.md](CHANGES.md) for detailed changelog.**
 
----
-
-## Next Steps (Priority Order)
+## Done Recently
 
 ### Documentation & Examples ✅ **COMPLETE**
+
 **Completed:**
 - ✅ Documentation created (quickstart, architecture, API reference)
 - ✅ Chat application example (WebSocket + bidirectional RPC)
@@ -56,8 +30,40 @@
 - [ ] Set up Sphinx for hosted docs (optional - markdown docs sufficient for now)
 - [ ] Write TypeScript → Python migration guide
 
+### Property-Based Testing ✅ **COMPLETE**
+
+Generate random inputs to find edge cases using Hypothesis.
+
+**Completed:**
+- ✅ Added Hypothesis library (v6.100.0+)
+- ✅ Property tests for wire serialization (WireError, WireImport, WireExport, WirePromise, WireDate, WireCapture, WireRemap, etc.)
+- ✅ Property tests for ID allocation (sequential, bijective conversions, local/remote checks)
+- ✅ Property tests for expression evaluation (plain arrays, error expressions, capability references)
+- ✅ Property tests for RpcPayload ownership semantics (PARAMS, RETURN, OWNED sources, deep copying)
+- ✅ Property tests for RpcError factory methods (all error codes, data preservation)
+- ✅ Fuzz testing for error paths (malformed messages, various value types)
+- ✅ 44 property-based tests covering core invariants
+- ✅ All tests passing with 100+ examples per test
+
+**Files created:**
+- ✅ `tests/test_properties.py` - 44 property tests (766 lines)
+
+**Coverage improvements from PBT:**
+- error.py: 87% → 92% (+5%)
+- payload.py: 32% → 65% (+33%)
+- wire.py: 55% → 62% (+7%)
+
+**Benefits:**
+- Discovered edge cases in wire protocol parsing
+- Verified ID allocation invariants hold across wide range of values
+- Confirmed JSON serialization roundtrips work correctly
+- Validated error handling for malformed inputs
+- Tested payload ownership semantics prevent mutation bugs
+- Verified all RpcError factory methods produce correct error codes
 
 ---
+
+## Next Steps
 
 ### IL (Intermediate Language) Execution
 
@@ -199,39 +205,6 @@ Execute complex multi-step operations defined in IL on the server.
 - `docs/api/` (new)
 - `docs/guide/` (new)
 - `docs/protocol/` (new)
-
----
-
-### Property-Based Testing ✅ **COMPLETE**
-
-Generate random inputs to find edge cases using Hypothesis.
-
-**Completed:**
-- ✅ Added Hypothesis library (v6.100.0+)
-- ✅ Property tests for wire serialization (WireError, WireImport, WireExport, WirePromise, WireDate, WireCapture, WireRemap, etc.)
-- ✅ Property tests for ID allocation (sequential, bijective conversions, local/remote checks)
-- ✅ Property tests for expression evaluation (plain arrays, error expressions, capability references)
-- ✅ Property tests for RpcPayload ownership semantics (PARAMS, RETURN, OWNED sources, deep copying)
-- ✅ Property tests for RpcError factory methods (all error codes, data preservation)
-- ✅ Fuzz testing for error paths (malformed messages, various value types)
-- ✅ 44 property-based tests covering core invariants
-- ✅ All tests passing with 100+ examples per test
-
-**Files created:**
-- ✅ `tests/test_properties.py` - 44 property tests (766 lines)
-
-**Coverage improvements from PBT:**
-- error.py: 87% → 92% (+5%)
-- payload.py: 32% → 65% (+33%)
-- wire.py: 55% → 62% (+7%)
-
-**Benefits:**
-- Discovered edge cases in wire protocol parsing
-- Verified ID allocation invariants hold across wide range of values
-- Confirmed JSON serialization roundtrips work correctly
-- Validated error handling for malformed inputs
-- Tested payload ownership semantics prevent mutation bugs
-- Verified all RpcError factory methods produce correct error codes
 
 ---
 
