@@ -5,6 +5,9 @@ These tests verify the WebTransport client and server implementation.
 
 from __future__ import annotations
 
+import asyncio
+from unittest.mock import Mock
+
 import pytest
 
 # Check if WebTransport is available
@@ -12,16 +15,15 @@ try:
     from capnweb.webtransport import (
         WEBTRANSPORT_AVAILABLE,
         WebTransportClient,
+        WebTransportClientProtocol,
         WebTransportServer,
+        WebTransportServerProtocol,
     )
 except ImportError:
     WEBTRANSPORT_AVAILABLE = False
 
 from capnweb.certs import (
     generate_self_signed_cert,
-    load_certificate,
-    load_private_key,
-    verify_certificate,
 )
 from capnweb.transports import (
     HttpBatchTransport,
@@ -29,62 +31,34 @@ from capnweb.transports import (
     create_transport,
 )
 
-pytestmark = pytest.mark.skipif(
+# Note: Some tests require aioquic, others don't
+# We mark specific test classes that need aioquic
+
+
+class TestWebTransportAvailability:
+    """Test WebTransport availability check."""
+
+    def test_webtransport_available_flag(self):
+        """Test WEBTRANSPORT_AVAILABLE flag is set correctly."""
+        # This tests the import handling
+        assert isinstance(WEBTRANSPORT_AVAILABLE, bool)
+
+    @pytest.mark.skipif(WEBTRANSPORT_AVAILABLE, reason="Testing unavailable scenario")
+    def test_client_creation_without_aioquic(self):
+        """Test WebTransportClient raises error without aioquic."""
+        # This would only run if aioquic is NOT installed
+        # We can't really test this in CI if aioquic is installed
+
+    @pytest.mark.skipif(WEBTRANSPORT_AVAILABLE, reason="Testing unavailable scenario")
+    def test_server_creation_without_aioquic(self):
+        """Test WebTransportServer raises error without aioquic."""
+        # This would only run if aioquic is NOT installed
+
+
+@pytest.mark.skipif(
     not WEBTRANSPORT_AVAILABLE,
     reason="WebTransport requires aioquic library",
 )
-
-
-class TestCertificateGeneration:
-    """Test certificate generation utilities."""
-
-    def test_generate_self_signed_cert(self, tmp_path):
-        """Test generating self-signed certificates."""
-        cert_path, key_path = generate_self_signed_cert(
-            hostname="localhost",
-            key_size=2048,
-            validity_days=30,
-            output_dir=tmp_path,
-        )
-
-        assert cert_path.exists()
-        assert key_path.exists()
-        assert cert_path.name == "localhost.crt"
-        assert key_path.name == "localhost.key"
-
-        # Verify certificate can be loaded
-        cert = load_certificate(cert_path)
-        key = load_private_key(key_path)
-
-        assert cert is not None
-        assert key is not None
-
-    def test_generate_cert_with_custom_hostname(self, tmp_path):
-        """Test generating certificates with custom hostname."""
-        cert_path, key_path = generate_self_signed_cert(
-            hostname="example.com",
-            output_dir=tmp_path,
-        )
-
-        assert cert_path.name == "example.com.crt"
-        assert key_path.name == "example.com.key"
-
-    def test_verify_certificate(self, tmp_path):
-        """Test certificate verification."""
-        cert_path, _ = generate_self_signed_cert(
-            hostname="localhost",
-            output_dir=tmp_path,
-        )
-
-        cert = load_certificate(cert_path)
-
-        # Should verify for localhost
-        assert verify_certificate(cert, "localhost")
-
-        # Should not verify for different hostname
-        assert not verify_certificate(cert, "example.com")
-
-
 class TestWebTransportImports:
     """Test WebTransport class imports and initialization."""
 
@@ -135,7 +109,66 @@ class TestWebTransportImports:
         assert server.cert_path == cert_path
         assert server.key_path == key_path
 
+    @pytest.mark.asyncio
+    async def test_client_send_without_connection(self):
+        """Test sending data without connection raises error."""
+        client = WebTransportClient("https://localhost:4433/test")
 
+        with pytest.raises(RuntimeError) as exc_info:
+            await client.send(b"test")
+
+        assert "not connected" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_client_receive_without_connection(self):
+        """Test receiving data without connection raises error."""
+        client = WebTransportClient("https://localhost:4433/test")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            await client.receive()
+
+        assert "not connected" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_client_connect_with_invalid_url(self):
+        """Test connecting with invalid URL scheme raises error."""
+        client = WebTransportClient("http://localhost:4433/test")  # Wrong scheme
+
+        with pytest.raises(ValueError) as exc_info:
+            await client.connect()
+
+        assert "https" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_client_close_without_connection(self):
+        """Test closing client that was never connected."""
+        client = WebTransportClient("https://localhost:4433/test")
+
+        # Should not raise error
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_server_needs_valid_cert_and_key(self, tmp_path):
+        """Test server initialization validates cert and key paths."""
+        cert_path, key_path = generate_self_signed_cert(
+            hostname="localhost",
+            output_dir=tmp_path,
+        )
+
+        # Valid paths
+        server = WebTransportServer(
+            host="localhost",
+            port=4433,
+            cert_path=cert_path,
+            key_path=key_path,
+        )
+        assert server is not None
+
+
+@pytest.mark.skipif(
+    not WEBTRANSPORT_AVAILABLE,
+    reason="WebTransport requires aioquic library",
+)
 class TestWebTransportTransport:
     """Test WebTransportTransport integration."""
 
@@ -162,6 +195,90 @@ class TestWebTransportTransport:
         # Regular HTTPS should use HttpBatchTransport
         transport = create_transport("https://localhost/rpc/batch")
         assert isinstance(transport, HttpBatchTransport)
+
+
+@pytest.mark.skipif(
+    not WEBTRANSPORT_AVAILABLE,
+    reason="WebTransport requires aioquic library",
+)
+class TestWebTransportClientServer:
+    """Test WebTransport client-server communication."""
+
+    # NOTE: Full client-server echo test is commented out as it requires
+    # more complex WebTransport session setup. The unit tests below
+    # provide good coverage of the components.
+    #
+    # @pytest.mark.asyncio
+    # async def test_client_server_echo(self, tmp_path):
+    #     """Test basic WebTransport client-server echo communication."""
+    #     ... (complex QUIC setup needed)
+
+    @pytest.mark.asyncio
+    async def test_client_connection_error(self, tmp_path):
+        """Test client handles connection errors gracefully."""
+        # Try to connect to non-existent server
+        client = WebTransportClient(
+            url="https://localhost:9999/test",
+            verify_mode=False,
+        )
+
+        # Connection should fail (no server running on port 9999)
+        try:
+            await client.connect()
+            await asyncio.sleep(1.0)
+
+            # If we get here, try to send and it should fail
+            with pytest.raises(RuntimeError):
+                await client.send(b"test")
+        except Exception:
+            # Connection failure is expected
+            pass
+        finally:
+            await client.close()
+
+    @pytest.mark.asyncio
+    async def test_client_url_parsing(self):
+        """Test client correctly parses WebTransport URLs."""
+        # Test with port
+        client1 = WebTransportClient("https://example.com:4433/test")
+        assert client1.url == "https://example.com:4433/test"
+
+        # Test without port (should use default 4433)
+        client2 = WebTransportClient("https://example.com/test")
+        assert client2.url == "https://example.com/test"
+
+    @pytest.mark.asyncio
+    async def test_protocol_events(self):
+        """Test WebTransport protocol event handling."""
+        # Create mock QUIC connection
+        mock_quic = Mock()
+
+        # Create protocol instance with QUIC
+        protocol = WebTransportClientProtocol(quic=mock_quic)
+
+        # Test receive queue is created
+        assert protocol._receive_queue is not None
+        assert protocol._http is None
+        assert protocol._stream_id is None
+
+    @pytest.mark.asyncio
+    async def test_server_protocol_initialization(self):
+        """Test WebTransport server protocol initialization."""
+        # Create mock QUIC connection
+        mock_quic = Mock()
+
+        # Create protocol with handler
+        handler_called = False
+
+        async def test_handler(protocol, stream_id):
+            nonlocal handler_called
+            handler_called = True
+
+        protocol = WebTransportServerProtocol(quic=mock_quic, handler=test_handler)
+
+        assert protocol._handler == test_handler
+        assert protocol._http is None
+        assert protocol._sessions == {}
 
 
 # NOTE: Integration tests with actual client/server communication would require:

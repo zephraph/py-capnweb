@@ -865,6 +865,7 @@ version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
+    { name = "aioquic" },
     { name = "cryptography" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -906,6 +907,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.9.0" },
+    { name = "aioquic", specifier = ">=1.2.0" },
     { name = "aioquic", marker = "extra == 'webtransport'", specifier = ">=1.2.0" },
     { name = "cryptography", specifier = ">=46.0.2" },
     { name = "httpx", marker = "extra == 'interop'", specifier = ">=0.25.0" },

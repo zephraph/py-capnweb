@@ -563,3 +563,114 @@ class TestCapabilityManagement:
             await client.close()
         finally:
             await server.stop()
+
+
+@pytest.mark.asyncio
+class TestClientStubCreation:
+    """Test client stub creation and capability export."""
+
+    async def test_create_stub_for_local_capability(self) -> None:
+        """Test creating a stub for a local capability."""
+        client_config = ClientConfig(url="http://127.0.0.1:18092/rpc/batch")
+        client = Client(client_config)
+
+        # Create a local capability
+        local_calc = Calculator()
+
+        # Create a stub for it
+        stub = client.create_stub(local_calc)
+
+        # Stub should be an RpcStub wrapping the target
+        assert stub is not None
+
+        await client.close()
+
+    async def test_capability_passed_to_server(self) -> None:
+        """Test passing a local capability to the server."""
+        # This tests the client.create_stub() -> serializer export path
+
+        class Receiver(RpcTarget):
+            """A target that receives capabilities."""
+
+            def __init__(self) -> None:
+                self.received_cap = None
+
+            async def call(self, method: str, args: list[Any]) -> Any:
+                if method == "receive_cap":
+                    # Server receives a capability from client
+                    self.received_cap = args[0]
+                    return "received"
+                if method == "use_cap":
+                    # Try to use the received capability
+                    # In a real implementation, this would be an RpcStub
+                    return "capability stored"
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
+
+            async def get_property(self, property: str) -> Any:
+                return None
+
+        config = ServerConfig(host="127.0.0.1", port=18092)
+        server = Server(config)
+        receiver = Receiver()
+        server.register_capability(0, receiver)
+        await server.start()
+        await asyncio.sleep(0.1)
+
+        try:
+            client_config = ClientConfig(url="http://127.0.0.1:18092/rpc/batch")
+            client = Client(client_config)
+
+            # Create a local capability
+            local_calc = Calculator()
+            stub = client.create_stub(local_calc)
+
+            # Pass the stub to the server
+            # Note: This tests the export path but the server won't be able to call back
+            # in HTTP batch mode (would need WebSocket for true bidirectional)
+            result = await client.call(0, "receive_cap", [stub])
+            assert result == "received"
+
+            await client.close()
+        finally:
+            await server.stop()
+
+    async def test_property_path_in_call(self) -> None:
+        """Test calling methods with property paths."""
+
+        class NestedTarget(RpcTarget):
+            """Target with nested structure."""
+
+            async def call(self, method: str, args: list[Any]) -> Any:
+                if method == "getValue":
+                    return {"nested": {"value": 42}}
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
+
+            async def get_property(self, property: str) -> Any:
+                if property == "nested":
+                    return {"value": 42}
+                return None
+
+        config = ServerConfig(host="127.0.0.1", port=18093)
+        server = Server(config)
+        server.register_capability(0, NestedTarget())
+        await server.start()
+        await asyncio.sleep(0.1)
+
+        try:
+            client_config = ClientConfig(url="http://127.0.0.1:18093/rpc/batch")
+            client = Client(client_config)
+
+            # Call with property path
+            result = await client.call(
+                0,
+                "getValue",
+                [],
+                property_path=[],  # Empty property path
+            )
+            assert result == {"nested": {"value": 42}}
+
+            await client.close()
+        finally:
+            await server.stop()
