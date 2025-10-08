@@ -31,5 +31,6 @@ clean:
 	find . -type f -name "*.pyc" -delete
 
 publish: clean
+	git push --tags
 	uv build
 	twine upload dist/*
