@@ -1004,6 +1004,7 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "hypothesis" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1039,6 +1040,7 @@ requires-dist = [
     { name = "aioquic", marker = "extra == 'webtransport'", specifier = ">=1.2.0" },
     { name = "cryptography", specifier = ">=46.0.2" },
     { name = "httpx", marker = "extra == 'interop'", specifier = ">=0.25.0" },
+    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
