@@ -17,7 +17,7 @@ check: lint
 
 lint:
 	ruff check
-	pyrefly check
+	pyrefly check src
 	ruff format --check
 
 format:

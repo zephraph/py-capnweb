@@ -49,7 +49,7 @@ class TestCertificateGeneration:
 
     def test_generate_cert_with_custom_key_size(self, tmp_path):
         """Test generating certificate with custom key size."""
-        cert_path, key_path = generate_self_signed_cert(
+        _cert_path, key_path = generate_self_signed_cert(
             hostname="localhost",
             key_size=4096,  # Larger key
             output_dir=tmp_path,
@@ -61,7 +61,7 @@ class TestCertificateGeneration:
 
     def test_generate_cert_with_ip_address(self, tmp_path):
         """Test generating certificate for IP address."""
-        cert_path, key_path = generate_self_signed_cert(
+        cert_path, _key_path = generate_self_signed_cert(
             hostname="192.168.1.1",
             output_dir=tmp_path,
         )
@@ -73,7 +73,7 @@ class TestCertificateGeneration:
 
     def test_generate_cert_with_ipv6_address(self, tmp_path):
         """Test generating certificate for IPv6 address."""
-        cert_path, key_path = generate_self_signed_cert(
+        cert_path, _key_path = generate_self_signed_cert(
             hostname="::1",
             output_dir=tmp_path,
         )
@@ -148,7 +148,7 @@ class TestCertificateGeneration:
 
         # Certificate should be expired or very close to expiry
         # This might be timing-sensitive, so we just check it doesn't crash
-        result = verify_certificate(cert, "test.local")
+        _result = verify_certificate(cert, "test.local")
         # Result could be True or False depending on timing
 
     def test_load_nonexistent_certificate(self, tmp_path):

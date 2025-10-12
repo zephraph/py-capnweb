@@ -230,7 +230,7 @@ class TestWebTransportClientServer:
             # If we get here, try to send and it should fail
             with pytest.raises(RuntimeError):
                 await client.send(b"test")
-        except Exception:
+        except Exception:  # noqa: S110
             # Connection failure is expected
             pass
         finally:
