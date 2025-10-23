@@ -8,11 +8,14 @@ import asyncio
 
 # Import the chat example classes
 import sys
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from capnweb.client import Client, ClientConfig
+from capnweb.error import RpcError
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 
@@ -22,24 +25,41 @@ sys.path.insert(0, str(examples_dir))
 from server import ChatRoom  # noqa: E402  # type: ignore[import-not-found]
 
 
-class MockChatClient(RpcTarget):
-    """Mock client that collects messages instead of printing them."""
+@dataclass
+class ChatClientForTesting(RpcTarget):
+    """Testing version of ChatClient that collects messages for assertions.
 
-    def __init__(self, username: str):
-        self.username = username
-        self.messages: list[dict] = []
+    This is based on the real ChatClient from examples/chat/client.py,
+    but collects messages instead of printing them.
+    """
 
-    async def call(self, method: str, args: list) -> None:
+    username: str
+
+    def __post_init__(self):
+        self.messages: list[dict[str, str]] = []
+
+    async def call(self, method: str, args: list[Any]) -> Any:
+        """Handle RPC method calls from the server."""
         match method:
             case "onMessage":
-                self.messages.append(args[0])
+                return await self._on_message(args[0])
             case _:
-                msg = f"Unknown method: {method}"
-                raise ValueError(msg)
+                msg = f"Method {method} not found"
+                raise RpcError.not_found(msg)
 
-    async def get_property(self, property: str):
-        msg = f"Unknown property: {property}"
-        raise ValueError(msg)
+    async def get_property(self, property: str) -> Any:
+        """Handle property access."""
+        msg = f"Property {property} not found"
+        raise RpcError.not_found(msg)
+
+    async def _on_message(self, message: dict[str, str]) -> None:
+        """Receive a message from the server.
+
+        Args:
+            message: Dictionary with 'username', 'text', and 'type' keys
+        """
+        # Collect messages for testing instead of printing
+        self.messages.append(message)
 
 
 @pytest.fixture
@@ -67,7 +87,7 @@ async def test_chat_basic_flow(chat_server):
 
     async with Client(config) as client:
         # Create test client
-        test_client = MockChatClient("Alice")
+        test_client = ChatClientForTesting("Alice")
         client_stub = client.create_stub(test_client)
 
         # Join chat
@@ -106,8 +126,8 @@ async def test_chat_multiple_users(chat_server):
 
     async with Client(alice_config) as alice_client, Client(bob_config) as bob_client:
         # Create test clients
-        alice_test = MockChatClient("Alice")
-        bob_test = MockChatClient("Bob")
+        alice_test = ChatClientForTesting("Alice")
+        bob_test = ChatClientForTesting("Bob")
 
         alice_stub = alice_client.create_stub(alice_test)
         bob_stub = bob_client.create_stub(bob_test)
@@ -172,8 +192,8 @@ async def test_chat_duplicate_username(chat_server):
     config2 = ClientConfig(url=url)
 
     async with Client(config1) as client1, Client(config2) as client2:
-        test1 = MockChatClient("Alice")
-        test2 = MockChatClient("Alice")
+        test1 = ChatClientForTesting("Alice")
+        test2 = ChatClientForTesting("Alice")
 
         stub1 = client1.create_stub(test1)
         stub2 = client2.create_stub(test2)
@@ -197,7 +217,7 @@ async def test_chat_message_history(chat_server):
     # Alice joins and sends messages
     config1 = ClientConfig(url=url)
     async with Client(config1) as alice_client:
-        alice_test = MockChatClient("Alice")
+        alice_test = ChatClientForTesting("Alice")
         alice_stub = alice_client.create_stub(alice_test)
 
         await alice_client.call(0, "join", ["Alice", alice_stub])
@@ -209,7 +229,7 @@ async def test_chat_message_history(chat_server):
         # Bob joins - should see history in welcome
         config2 = ClientConfig(url=url)
         async with Client(config2) as bob_client:
-            bob_test = MockChatClient("Bob")
+            bob_test = ChatClientForTesting("Bob")
             bob_stub = bob_client.create_stub(bob_test)
 
             welcome = await bob_client.call(0, "join", ["Bob", bob_stub])
@@ -247,7 +267,7 @@ async def test_chat_broadcast_to_all(chat_server):
         # Create test clients and join
         test_clients = []
         for i, name in enumerate(names):
-            test_client = MockChatClient(name)
+            test_client = ChatClientForTesting(name)
             test_clients.append(test_client)
             stub = clients[i].create_stub(test_client)
             await clients[i].call(0, "join", [name, stub])
