@@ -10,13 +10,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from capnweb.webtransport import (
-    WebTransportClient,
-    WebTransportClientProtocol,
-    WebTransportServer,
-    WebTransportServerProtocol,
-)
-
 from capnweb.certs import (
     generate_self_signed_cert,
 )
@@ -24,6 +17,12 @@ from capnweb.transports import (
     HttpBatchTransport,
     WebTransportTransport,
     create_transport,
+)
+from capnweb.webtransport import (
+    WebTransportClient,
+    WebTransportClientProtocol,
+    WebTransportServer,
+    WebTransportServerProtocol,
 )
 
 # Note: Some tests require aioquic, others don't
