@@ -26,9 +26,6 @@ dependencies = [
     "aiohttp>=3.9.0",
     "websockets>=12.0",
     "typing-extensions>=4.9.0",
-    "pytest>=8.4.2",
-    "pytest-cov>=7.0.0",
-    "pytest-asyncio>=1.2.0",
     "cryptography>=46.0.2",
     "aioquic>=1.2.0",
 ]
@@ -45,8 +42,11 @@ dev = [
     "honcho>=2.0.0",
     "hypothesis>=6.100.0",
     "nox>=2025.5.1",
+    "pre-commit>=4.3.0",
     "pyrefly>=0.35.0",
     "pytest-asyncio>=1.2.0",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
     "pyupgrade>=3.20.0",
     "ruff>=0.13.2",
     "tox>=4.30.2",
@@ -54,19 +54,11 @@ dev = [
     "uv-build>=0.8.22",
     "vulture>=2.14",
 ]
-
-[project.optional-dependencies]
-dev = [
-    "hypothesis>=6.100.0",
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.23.0",
-    "pytest-cov>=4.1.0",
-    "mypy>=1.8.0",
-    "ruff>=0.1.0",
-]
 interop = [
     "httpx>=0.25.0",
 ]
+
+# FIXME: currently in main dependencies.
 webtransport = [
     "aioquic>=1.2.0",
 ]
@@ -113,4 +105,3 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
-
