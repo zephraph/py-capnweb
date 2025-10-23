@@ -18,3 +18,8 @@ node_modules
 # Test cruft
 .coverage
 .hypothesis
+
+/examples/webtransport/localhost.crt
+/examples/webtransport-integrated/localhost.crt
+/examples/webtransport/localhost.key
+/examples/webtransport-integrated/localhost.key
