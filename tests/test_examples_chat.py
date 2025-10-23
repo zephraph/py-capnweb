@@ -57,8 +57,7 @@ async def chat_server():
     await server.stop()
 
 
-@pytest.mark.skip(reason="Requires WebSocket server support for bidirectional RPC")
-@pytest.mark.skip(reason="Requires WebSocket server support for bidirectional RPC")
+@pytest.mark.skip(reason="WebSocket bidirectional RPC not yet implemented - server cannot initiate calls to clients")
 @pytest.mark.asyncio
 async def test_chat_basic_flow(chat_server):
     """Test basic chat flow: join, send message, leave."""
@@ -97,7 +96,7 @@ async def test_chat_basic_flow(chat_server):
         await client.call(0, "leave", ["Alice"])
 
 
-@pytest.mark.skip(reason="Requires WebSocket server support for bidirectional RPC")
+@pytest.mark.skip(reason="WebSocket bidirectional RPC not yet implemented - server cannot initiate calls to clients")
 @pytest.mark.asyncio
 async def test_chat_multiple_users(chat_server):
     """Test multiple users chatting."""
@@ -166,7 +165,7 @@ async def test_chat_multiple_users(chat_server):
         await bob_client.call(0, "leave", ["Bob"])
 
 
-@pytest.mark.skip(reason="Requires WebSocket server support for bidirectional RPC")
+@pytest.mark.skip(reason="WebSocket bidirectional RPC not yet implemented - server cannot initiate calls to clients")
 @pytest.mark.asyncio
 async def test_chat_duplicate_username(chat_server):
     """Test that duplicate usernames are rejected."""
@@ -193,7 +192,7 @@ async def test_chat_duplicate_username(chat_server):
         await client1.call(0, "leave", ["Alice"])
 
 
-@pytest.mark.skip(reason="Requires WebSocket server support for bidirectional RPC")
+@pytest.mark.skip(reason="WebSocket bidirectional RPC not yet implemented - server cannot initiate calls to clients")
 @pytest.mark.asyncio
 async def test_chat_message_history(chat_server):
     """Test that new users receive message history."""
@@ -234,7 +233,7 @@ async def test_chat_message_history(chat_server):
         await alice_client.call(0, "leave", ["Alice"])
 
 
-@pytest.mark.skip(reason="Requires WebSocket server support for bidirectional RPC")
+@pytest.mark.skip(reason="WebSocket bidirectional RPC not yet implemented - server cannot initiate calls to clients")
 @pytest.mark.asyncio
 async def test_chat_broadcast_to_all(chat_server):
     """Test that messages are broadcast to all connected users."""

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
+import aiohttp
 from aiohttp import web
 
 from capnweb.error import RpcError
@@ -99,7 +100,8 @@ class Server(RpcSession):
     """Cap'n Web server implementation.
 
     Supports multiple transport protocols:
-    - POST /rpc/batch: HTTP batch RPC
+    - POST /rpc/batch: HTTP batch RPC (full bidirectional support)
+    - GET /rpc/ws: WebSocket RPC (partial support - client→server only)
     - WebTransport /rpc/wt: HTTP/3/QUIC RPC (optional, requires aioquic)
 
     Extends RpcSession to get unified import/export table management.
@@ -114,6 +116,7 @@ class Server(RpcSession):
        - Server holds session state in memory between requests
        - Memory usage grows with number of active sessions
        - Resume tokens enable "sessionful" model over stateless HTTP
+       - ✅ Full bidirectional RPC support
        - Best for: Short-lived sessions, single-server deployments
 
     2. **WebSocket (Stateful Transport)**:
@@ -121,11 +124,28 @@ class Server(RpcSession):
        - Session state lifetime tied to connection
        - More resource-efficient (session ends when connection closes)
        - No need for resume tokens within same connection
-       - Best for: Long-running sessions, real-time communication
+       - ⚠️ **Limitation**: Client→server RPC only (no server-initiated calls yet)
+       - Best for: Long-running sessions where only client initiates calls
+
+    3. **WebTransport (HTTP/3/QUIC)**:
+       - High-performance multiplexed streams
+       - 0-RTT reconnection support
+       - ✅ Full bidirectional RPC support
+       - Best for: High-throughput, low-latency applications
+
+    WebSocket Bidirectional RPC Status:
+    -----------------------------------
+    Current WebSocket implementation supports REQUEST-RESPONSE pattern:
+    - Client calls server methods: ✅ Works
+    - Server responds to client: ✅ Works
+    - Server initiates calls to client: ❌ Not yet implemented
+
+    For bidirectional RPC (server calling client methods), use HTTP Batch or WebTransport.
 
     For production deployments:
     - Consider memory implications of holding sessions for HTTP clients
-    - Use WebSocket for long-lived, stateful interactions
+    - Use WebSocket for client→server RPC with persistent connections
+    - Use HTTP Batch or WebTransport for bidirectional RPC
     - Use distributed session store (Redis) for multi-server HTTP deployments
     - Set appropriate `resume_token_ttl` to balance UX and resource usage
     """
@@ -211,6 +231,7 @@ class Server(RpcSession):
         """Start the server."""
         self._app = web.Application()
         self._app.router.add_post("/rpc/batch", self._handle_batch)
+        self._app.router.add_get("/rpc/ws", self._handle_websocket)
 
         self._runner = web.AppRunner(self._app)
         await self._runner.setup()
@@ -296,6 +317,127 @@ class Server(RpcSession):
                 content_type="application/x-ndjson",
                 status=500,
             )
+
+    async def _handle_websocket(self, request: web.Request) -> web.WebSocketResponse:
+        """Handle WebSocket connections for RPC.
+
+        This provides a persistent connection for long-lived sessions.
+
+        **Current Limitation**: This implementation supports CLIENT→SERVER RPC only.
+        The server can respond to client requests but cannot initiate calls to clients.
+        For full bidirectional RPC (server calling client methods), use HTTP Batch
+        or WebTransport transports instead.
+
+        Session Management:
+        - Creates session-specific import table for connection lifetime
+        - Maintains state across multiple messages within the same connection
+        - Cleans up resources automatically when connection closes
+        """
+        ws = web.WebSocketResponse()
+        await ws.prepare(request)
+
+        # Create session-specific import table for this WebSocket connection
+        # Unlike HTTP batch (stateless), WebSocket maintains state for the connection lifetime
+        ws_imports: dict[int, StubHook] = {}
+
+        try:
+            # Track push sequence for this WebSocket session
+            next_push_import_id = 1
+
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    # Parse NDJSON batch
+                    try:
+                        messages = parse_wire_batch(msg.data)
+
+                        if len(messages) > self.config.max_batch_size:
+                            error = WireAbort(f"Batch size {len(messages)} exceeds maximum")
+                            await ws.send_str(serialize_wire_batch([error]))
+                            break
+
+                        # Process messages
+                        responses: list[WireMessage] = []
+                        for wire_msg in messages:
+                            match wire_msg:
+                                case WirePush():
+                                    # Assign sequential import ID for this push
+                                    import_id = next_push_import_id
+                                    next_push_import_id += 1
+                                    response = await self._handle_push(
+                                        wire_msg.expression, import_id, ws_imports
+                                    )
+                                case WirePull():
+                                    response = await self._handle_pull(wire_msg.import_id, ws_imports)
+                                case _:
+                                    response = await self._process_message(wire_msg)
+
+                            if response:
+                                responses.append(response)
+
+                        # Send responses back over WebSocket
+                        if responses:
+                            response_text = serialize_wire_batch(responses)
+                            await ws.send_str(response_text)
+
+                    except Exception as e:
+                        # Send error and continue (don't break connection on parse errors)
+                        error = WireAbort(f"Error processing message: {e}")
+                        await ws.send_str(serialize_wire_batch([error]))
+
+                elif msg.type == aiohttp.WSMsgType.BINARY:
+                    # Handle binary messages same as text
+                    try:
+                        messages = parse_wire_batch(msg.data.decode("utf-8"))
+
+                        if len(messages) > self.config.max_batch_size:
+                            error = WireAbort(f"Batch size {len(messages)} exceeds maximum")
+                            await ws.send_bytes(serialize_wire_batch([error]).encode("utf-8"))
+                            break
+
+                        # Process messages
+                        responses: list[WireMessage] = []
+                        for wire_msg in messages:
+                            match wire_msg:
+                                case WirePush():
+                                    import_id = next_push_import_id
+                                    next_push_import_id += 1
+                                    response = await self._handle_push(
+                                        wire_msg.expression, import_id, ws_imports
+                                    )
+                                case WirePull():
+                                    response = await self._handle_pull(wire_msg.import_id, ws_imports)
+                                case _:
+                                    response = await self._process_message(wire_msg)
+
+                            if response:
+                                responses.append(response)
+
+                        # Send responses
+                        if responses:
+                            response_data = serialize_wire_batch(responses).encode("utf-8")
+                            await ws.send_bytes(response_data)
+
+                    except Exception as e:
+                        error = WireAbort(f"Error processing message: {e}")
+                        await ws.send_bytes(serialize_wire_batch([error]).encode("utf-8"))
+
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    logger = logging.getLogger(__name__)
+                    logger.error("WebSocket error: %s", ws.exception())
+                    break
+
+                elif msg.type == aiohttp.WSMsgType.CLOSE:
+                    break
+
+        finally:
+            # Clean up WebSocket session imports
+            # Dispose of any capabilities that were imported during this session
+            for hook in ws_imports.values():
+                with contextlib.suppress(Exception):
+                    # Best effort cleanup - ignore any disposal errors
+                    hook.dispose()
+
+        return ws
 
     async def _process_message(self, msg: WireMessage) -> WireMessage | None:
         """Process a single wire message.

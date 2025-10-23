@@ -94,14 +94,14 @@ async with Client(config) as client:
 
 **Transports:**
 - ✅ HTTP Batch (production-ready)
-- ✅ WebSocket (production-ready)
+- ⚠️ WebSocket (partial support - client→server RPC only, bidirectional RPC in progress)
 - ✅ WebTransport/HTTP/3 (production-ready, requires aioquic)
 
 **Protocol Features:**
 - ✅ Wire protocol (all message types)
 - ✅ Promise pipelining
 - ✅ Expression evaluation (including `.map()`)
-- ✅ Bidirectional RPC
+- ⚠️ Bidirectional RPC (HTTP Batch only, WebSocket support in progress)
 - ✅ Resume tokens
 - ✅ Reference counting
 - ✅ Structured errors
@@ -126,14 +126,33 @@ async with Client(config) as client:
 **Included examples:**
 - `examples/calculator/` - Simple RPC calculator
 - `examples/batch-pipelining/` - Promise pipelining demonstration
-- `examples/peer_to_peer/` - Bidirectional RPC (Alice & Bob)
-- `examples/chat/` - Real-time WebSocket chat with bidirectional RPC
+- `examples/peer_to_peer/` - Bidirectional RPC (Alice & Bob) - HTTP Batch only
+- `examples/chat/` - ⚠️ Real-time WebSocket chat (requires bidirectional WebSocket - in progress)
 - `examples/microservices/` - Service mesh architecture
 - `examples/actor-system/` - Distributed actor system with supervisor/worker
 - `examples/webtransport/` - WebTransport/HTTP/3 standalone demo
 - `examples/webtransport-integrated/` - WebTransport with full RPC
 
 Each example includes a README with running instructions.
+
+## Transport Limitations
+
+**Current WebSocket Support:**
+- ✅ Client can connect to server via `ws://` or `wss://` URLs
+- ✅ Client can call server methods (request-response RPC)
+- ✅ Server can respond to client requests
+- ❌ Server **cannot** initiate calls to clients (no bidirectional RPC yet)
+- ❌ Chat example currently non-functional due to this limitation
+
+**Workaround for bidirectional RPC:**
+Use HTTP Batch transport instead - it supports full bidirectional RPC including:
+- Passing client capabilities to server
+- Server calling methods on client capabilities
+- See `examples/peer_to_peer/` for working bidirectional RPC example
+
+**WebTransport:**
+- Full bidirectional support (production-ready)
+- Requires `aioquic` library: `pip install capnweb[webtransport]`
 
 ## Development
 
