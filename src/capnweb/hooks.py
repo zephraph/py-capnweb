@@ -442,18 +442,18 @@ class ChainedImportHook(StubHook):
     import_id: int
     path: list[str | int]
 
-    async def call(self, extra_path: list[str | int], args: RpcPayload) -> StubHook:
+    async def call(self, path: list[str | int], args: RpcPayload) -> StubHook:
         """Call a method, combining the stored path with the extra path.
 
         Args:
-            extra_path: Additional path elements (usually empty for method calls)
+            path: Additional path elements (usually empty for method calls)
             args: Arguments
 
         Returns:
             A PromiseStubHook for the result
         """
         # Combine paths: stored path + extra path
-        full_path = self.path + extra_path
+        full_path = self.path + path
 
         # Create a new import ID for the result
         result_import_id = self.session.allocate_import_id()
@@ -467,17 +467,17 @@ class ChainedImportHook(StubHook):
 
         return PromiseStubHook(future)
 
-    def get(self, extra_path: list[str | int]) -> StubHook:
+    def get(self, path: list[str | int]) -> StubHook:
         """Get a property, extending the path.
 
         Args:
-            extra_path: Additional path elements
+            path: Additional path elements
 
         Returns:
             A new ChainedImportHook with extended path
         """
         # Chain another level
-        return ChainedImportHook(self.session, self.import_id, self.path + extra_path)
+        return ChainedImportHook(self.session, self.import_id, self.path + path)
 
     async def pull(self) -> RpcPayload:
         """Pull the value (triggers actual GET operation).

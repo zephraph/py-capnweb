@@ -29,11 +29,11 @@ class Importer(Protocol):
     This is typically implemented by RpcSession (Client/Server).
     """
 
-    def import_capability(self, import_id: int) -> StubHook:
+    def import_capability(self, remote_export_id: int) -> StubHook:
         """Import a capability and return its hook.
 
         Args:
-            import_id: The import ID for this capability
+            remote_export_id: The remote export ID for this capability
 
         Returns:
             A StubHook representing the imported capability
