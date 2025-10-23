@@ -24,12 +24,12 @@ class PropertyKey:
     @staticmethod
     def from_json(value: Any) -> PropertyKey:
         """Parse from JSON value."""
-        if isinstance(value, str):
-            return PropertyKey(value)
-        if isinstance(value, int):
-            return PropertyKey(value)
-        msg = f"Invalid property key: {value}"
-        raise ValueError(msg)
+        match value:
+            case str() | int():
+                return PropertyKey(value)
+            case _:
+                msg = f"Invalid property key: {value}"
+                raise ValueError(msg)
 
 
 # Wire Expressions
@@ -271,68 +271,67 @@ WireExpression = (
 
 def wire_expression_from_json(value: Any) -> WireExpression:  # noqa: C901
     """Parse a wire expression from JSON."""
-    if value is None or isinstance(value, bool | int | float | str):
-        return value
-
-    if isinstance(value, dict):
-        return {k: wire_expression_from_json(v) for k, v in value.items()}
-
-    if isinstance(value, list):
-        if not value:
+    match value:
+        case None | bool() | int() | float() | str():
             return value
+        case dict():
+            return {k: wire_expression_from_json(v) for k, v in value.items()}
+        case list():
+            if not value:
+                return value
 
-        # Check for escaped literal arrays: [[...]]
-        # If the array has exactly one element and that element is also an array,
-        # it's likely an escaped literal (unless it's a VALID special form)
-        if len(value) == 1 and isinstance(value[0], list):
-            inner = value[0]
-            # Check if the inner array is a VALID special form
-            # Not just starts with a keyword, but has correct structure
-            is_valid_special_form = False
-            if inner and isinstance(inner[0], str):
-                tag = inner[0]
-                if (
-                    (tag == "error" and len(inner) >= 3)
-                    or (tag in {"import", "export", "promise"} and len(inner) == 2)
-                    or (tag == "pipeline" and len(inner) >= 2)
-                    or (tag == "date" and len(inner) == 2)
-                    or (tag == "remap" and len(inner) == 5)
-                ):
-                    is_valid_special_form = True
+            # Check for escaped literal arrays: [[...]]
+            # If the array has exactly one element and that element is also an array,
+            # it's likely an escaped literal (unless it's a VALID special form)
+            if len(value) == 1 and isinstance(value[0], list):
+                inner = value[0]
+                # Check if the inner array is a VALID special form
+                # Not just starts with a keyword, but has correct structure
+                is_valid_special_form = False
+                if inner and isinstance(inner[0], str):
+                    tag = inner[0]
+                    if (
+                        (tag == "error" and len(inner) >= 3)
+                        or (tag in {"import", "export", "promise"} and len(inner) == 2)
+                        or (tag == "pipeline" and len(inner) >= 2)
+                        or (tag == "date" and len(inner) == 2)
+                        or (tag == "remap" and len(inner) == 5)
+                    ):
+                        is_valid_special_form = True
 
-            if is_valid_special_form:
-                # This is a valid special form, parse it
-                return wire_expression_from_json(inner)
-            # This is an escaped literal array, unwrap it
-            return [wire_expression_from_json(item) for item in inner]
+                if is_valid_special_form:
+                    # This is a valid special form, parse it
+                    return wire_expression_from_json(inner)
+                # This is an escaped literal array, unwrap it
+                return [wire_expression_from_json(item) for item in inner]
 
-        # Check for special forms (arrays starting with a string)
-        if isinstance(value[0], str):
-            tag = value[0]
-            match tag:
-                case "error":
-                    return WireError.from_json(value)
-                # DON'T convert export/import/promise here - these are application-level
-                # expressions that the Parser needs to handle to create RpcStubs.
-                # Only convert wire-level expressions (error, pipeline, date, remap).
-                case "import" | "export" | "promise":
-                    # Leave these as plain lists for the Parser
-                    return value
-                case "pipeline":
-                    return WirePipeline.from_json(value)
-                case "date":
-                    return WireDate.from_json(value)
-                case "remap":
-                    return WireRemap.from_json(value)
-                case _:
-                    # Regular array, parse elements
-                    return [wire_expression_from_json(item) for item in value]
-        else:
-            # Regular array
-            return [wire_expression_from_json(item) for item in value]
-
-    msg = f"Invalid wire expression: {value}"
-    raise ValueError(msg)
+            # Check for special forms (arrays starting with a string)
+            if isinstance(value[0], str):
+                tag = value[0]
+                match tag:
+                    case "error":
+                        return WireError.from_json(value)
+                    # DON'T convert export/import/promise here - these are application-level
+                    # expressions that the Parser needs to handle to create RpcStubs.
+                    # Only convert wire-level expressions (error, pipeline, date, remap).
+                    case "import" | "export" | "promise":
+                        # Leave these as plain lists for the Parser
+                        return value
+                    case "pipeline":
+                        return WirePipeline.from_json(value)
+                    case "date":
+                        return WireDate.from_json(value)
+                    case "remap":
+                        return WireRemap.from_json(value)
+                    case _:
+                        # Regular array, parse elements
+                        return [wire_expression_from_json(item) for item in value]
+            else:
+                # Regular array
+                return [wire_expression_from_json(item) for item in value]
+        case _:
+            msg = f"Invalid wire expression: {value}"
+            raise ValueError(msg)
 
 
 def wire_expression_to_json(expr: WireExpression, escape_arrays: bool = False) -> Any:

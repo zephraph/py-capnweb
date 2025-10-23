@@ -65,6 +65,20 @@ class StubHook(ABC):
         ...
 
     @abstractmethod
+    def map(self, path: list[str | int], captures: list[StubHook], instructions: list[Any]) -> StubHook:
+        """Apply a map operation through this hook.
+
+        Args:
+            path: Property path to the iterable to map over
+            captures: External capabilities used in the map function
+            instructions: A list of operations to perform for each element
+
+        Returns:
+            A new StubHook representing the promise for the mapped result
+        """
+        ...
+
+    @abstractmethod
     async def pull(self) -> RpcPayload:
         """Pull the final value from this hook.
 
@@ -116,6 +130,13 @@ class ErrorStubHook(StubHook):
 
     def get(self, path: list[str | int]) -> StubHook:
         """Always returns self (errors propagate through chains)."""
+        return self
+
+    def map(self, path: list[str | int], captures: list[StubHook], instructions: list[Any]) -> StubHook:
+        """Dispose captures and return self (errors propagate)."""
+        # Dispose captures as we are taking ownership.
+        for cap in captures:
+            cap.dispose()
         return self
 
     async def pull(self) -> RpcPayload:
@@ -230,15 +251,17 @@ class PayloadStubHook(StubHook):
         current = self.payload.value
 
         for segment in path:
-            if isinstance(segment, int):
-                # Array index
-                current = current[segment]
-            elif isinstance(current, dict):
-                # Dictionary key
-                current = current[segment]
-            else:
-                # Object attribute
-                current = getattr(current, segment)
+            match (segment, current):
+                case (int(), _):
+                    # Array index
+                    current = current[segment]
+                case (_, dict()):
+                    # Dictionary key
+                    current = current[segment]
+                case (str(), _):
+                    # Object attribute - segment is guaranteed to be str here
+                    assert isinstance(segment, str)  # Type narrowing for type checker
+                    current = getattr(current, segment)
 
         return current
 
