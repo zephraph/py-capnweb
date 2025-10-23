@@ -80,8 +80,8 @@ asyncio_mode = "auto"
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=capnweb",
-    "--cov-report=term-missing:skip-covered",
+    # "--cov=capnweb",
+    # "--cov-report=term-missing:skip-covered",
 ]
 markers = [
     "asyncio: mark test as an asyncio test",
@@ -92,7 +92,6 @@ markers = [
 #
 [tool.coverage.run]
 source = ["python/capnweb"]
-omit = ["*/tests/*"]
 
 [tool.coverage.report]
 exclude_lines = [

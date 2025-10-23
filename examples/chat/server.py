@@ -93,6 +93,7 @@ class ChatRoom(RpcTarget):
             "message": f"Welcome to the chat, {username}!",
             "userCount": len(self.clients),
             "users": list(self.clients.keys()),
+            "history": self._get_history(),
         }
 
     async def _leave(self, username: str) -> dict[str, str]:
