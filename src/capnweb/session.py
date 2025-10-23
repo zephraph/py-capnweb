@@ -48,6 +48,14 @@ class RpcSession:
         self._exports: dict[int, StubHook] = {}
         self._next_export_id = 1
 
+        # Mapping from remote export IDs to local import IDs
+        # This prevents collisions when both sides use the same export ID
+        self._remote_export_to_import: dict[int, int] = {}
+
+        # Reverse mapping from local import IDs to remote export IDs
+        # Used when calling back - we need to send the remote's export_id
+        self._import_to_remote_export: dict[int, int] = {}
+
         # Pending promises: promise_id -> Future[StubHook]
         self._pending_promises: dict[int, asyncio.Future[StubHook]] = {}
 
@@ -99,21 +107,29 @@ class RpcSession:
 
     # Importer Protocol Implementation
 
-    def import_capability(self, import_id: int) -> StubHook:
-        """Import a capability and return its hook.
+    def import_capability(self, remote_export_id: int) -> StubHook:
+        """Import a capability from a remote export.
 
         This is called by the Parser when it encounters ["export", id] in
         the wire format (the remote side is exporting to us).
 
         Args:
-            import_id: The import ID for this capability
+            remote_export_id: The export ID from the remote side
 
         Returns:
             A StubHook representing the imported capability
         """
-        # Check if we already have this import
-        if import_id in self._imports:
+        # Check if we already have an import for this remote export
+        if remote_export_id in self._remote_export_to_import:
+            import_id = self._remote_export_to_import[remote_export_id]
             return self._imports[import_id]
+
+        # Allocate a fresh local import ID to avoid collisions
+        import_id = self.allocate_import_id()
+
+        # Create bidirectional mapping
+        self._remote_export_to_import[remote_export_id] = import_id
+        self._import_to_remote_export[import_id] = remote_export_id
 
         # Create a new RpcImportHook for this capability
         import_hook = RpcImportHook(session=self, import_id=import_id)

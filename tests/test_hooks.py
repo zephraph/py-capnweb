@@ -6,6 +6,7 @@ import pytest
 
 from capnweb.error import RpcError
 from capnweb.hooks import (
+    ChainedImportHook,
     ErrorStubHook,
     PayloadStubHook,
     PromiseStubHook,
@@ -410,9 +411,11 @@ class TestRpcImportHook:
         session = RpcSession()
         hook = RpcImportHook(session=session, import_id=1)
 
-        # This will raise NotImplementedError
-        with pytest.raises(NotImplementedError, match="send_pipeline_get"):
-            hook.get(["property"])
+        # get() returns a ChainedImportHook without immediately triggering RPC
+        result = hook.get(["property"])
+        assert isinstance(result, ChainedImportHook)
+        assert result.import_id == 1
+        assert result.path == ["property"]
 
     @pytest.mark.asyncio
     async def test_import_hook_pull(self):

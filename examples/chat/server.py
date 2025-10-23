@@ -140,50 +140,45 @@ class ChatRoom(RpcTarget):
         return list(self.clients.keys())
 
     async def _broadcast_message(self, message: dict[str, str]) -> None:
-        """Broadcast a message to all clients."""
-        # Create a list of tasks to call all clients in parallel
-        tasks = []
+        """Broadcast a message to all clients (fire-and-forget)."""
+        # Call all clients without waiting for responses (avoid deadlock)
         for username, client in list(self.clients.items()):
             try:
-                # Call the client's onMessage method
-                task = client.onMessage(message)
-                tasks.append((username, task))
-            except Exception as e:
-                logger.error("Error preparing broadcast to %s: %s", username, e)
-
-        # Execute all calls in parallel
-        for username, task in tasks:
-            try:
-                await task
+                # Fire-and-forget: don't await the call
+                # This prevents deadlock when client is waiting for server response
+                # while server is waiting for client callback
+                asyncio.create_task(self._send_to_client(username, client, message))
             except Exception as e:
                 logger.error("Error broadcasting to %s: %s", username, e)
-                # Remove client if they're unreachable
-                if username in self.clients:
-                    self.clients.pop(username).dispose()
+
+    async def _send_to_client(
+        self, username: str, client: RpcStub, message: dict[str, str]
+    ) -> None:
+        """Send a message to a specific client (helper for fire-and-forget broadcast)."""
+        try:
+            await client.onMessage(message)
+        except Exception as e:
+            logger.error("Error sending message to %s: %s", username, e)
+            # Remove client if they're unreachable
+            if username in self.clients:
+                self.clients.pop(username).dispose()
 
     async def _broadcast_system_message(
         self, text: str, exclude: str | None = None
     ) -> None:
-        """Broadcast a system message to all clients."""
+        """Broadcast a system message to all clients (fire-and-forget)."""
         message = {"username": "System", "text": text, "type": "system"}
         self.message_history.append(message)
 
-        tasks = []
+        # Fire-and-forget to avoid deadlock
         for username, client in list(self.clients.items()):
             if username != exclude:
                 try:
-                    task = client.onMessage(message)
-                    tasks.append((username, task))
+                    asyncio.create_task(self._send_to_client(username, client, message))
                 except Exception as e:
                     logger.error(
-                        "Error preparing system message to %s: %s", username, e
+                        "Error broadcasting system message to %s: %s", username, e
                     )
-
-        for username, task in tasks:
-            try:
-                await task
-            except Exception as e:
-                logger.error("Error sending system message to %s: %s", username, e)
 
 
 async def main():

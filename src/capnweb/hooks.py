@@ -430,6 +430,79 @@ class TargetStubHook(StubHook):
 
 
 @dataclass
+class ChainedImportHook(StubHook):
+    """A hook representing a remote capability with a property path.
+
+    This hook defers GET vs CALL decision until the operation is actually performed.
+    This allows stub.method(args) to work as a direct CALL instead of GET+CALL.
+    """
+
+    session: RpcSession
+    import_id: int
+    path: list[str | int]
+
+    async def call(self, extra_path: list[str | int], args: RpcPayload) -> StubHook:
+        """Call a method, combining the stored path with the extra path.
+
+        Args:
+            extra_path: Additional path elements (usually empty for method calls)
+            args: Arguments
+
+        Returns:
+            A PromiseStubHook for the result
+        """
+        # Combine paths: stored path + extra path
+        full_path = self.path + extra_path
+
+        # Create a new import ID for the result
+        result_import_id = self.session.allocate_import_id()
+        future: asyncio.Future[StubHook] = asyncio.Future()
+        self.session.register_pending_import(result_import_id, future)
+
+        # Send CALL with the full path (including method name from stored path)
+        self.session.send_pipeline_call(
+            self.import_id, full_path, args, result_import_id
+        )
+
+        return PromiseStubHook(future)
+
+    def get(self, extra_path: list[str | int]) -> StubHook:
+        """Get a property, extending the path.
+
+        Args:
+            extra_path: Additional path elements
+
+        Returns:
+            A new ChainedImportHook with extended path
+        """
+        # Chain another level
+        return ChainedImportHook(self.session, self.import_id, self.path + extra_path)
+
+    async def pull(self) -> RpcPayload:
+        """Pull the value (triggers actual GET operation).
+
+        Returns:
+            The resolved payload
+        """
+        # Now we know it's a property access, send the GET
+        result_import_id = self.session.allocate_import_id()
+        future: asyncio.Future[StubHook] = asyncio.Future()
+        self.session.register_pending_import(result_import_id, future)
+        self.session.send_pipeline_get(self.import_id, self.path, result_import_id)
+
+        # Wait for result and pull it
+        hook = await future
+        return await hook.pull()
+
+    def dispose(self) -> None:
+        """No-op for chained hooks (no resources to release)."""
+
+    def dup(self) -> Self:
+        """Return self (chained hooks are immutable)."""
+        return self
+
+
+@dataclass
 class RpcImportHook(StubHook):
     """A hook representing a remote capability.
 
@@ -451,6 +524,11 @@ class RpcImportHook(StubHook):
         Returns:
             A PromiseStubHook for the result
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.debug(f"RpcImportHook.call: import_id={self.import_id}, path={path}")
+
         # Create a new import ID for the result
         result_import_id = self.session.allocate_import_id()
 
@@ -473,14 +551,12 @@ class RpcImportHook(StubHook):
             path: Property path
 
         Returns:
-            A PromiseStubHook for the property
+            A ChainedImportHook that defers GET/CALL decision
         """
-        # Similar to call, but no arguments
-        result_import_id = self.session.allocate_import_id()
-        future: asyncio.Future[StubHook] = asyncio.Future()
-        self.session.register_pending_import(result_import_id, future)
-        self.session.send_pipeline_get(self.import_id, path, result_import_id)
-        return PromiseStubHook(future)
+        # Return a chained hook that remembers the path
+        # This allows stub.method(args) to work as a direct CALL
+        # instead of GET+CALL
+        return ChainedImportHook(self.session, self.import_id, path)
 
     async def pull(self) -> RpcPayload:
         """Pull the value from the remote capability.

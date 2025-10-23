@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Self
@@ -62,12 +63,25 @@ class Client(RpcSession):
             HttpBatchTransport | WebSocketTransport | WebTransportTransport | None
         ) = None
         self._import_ref_counts: dict[int, int] = {}
+        # WebSocket bidirectional RPC support
+        self._ws_listener_task: asyncio.Task | None = None
+        self._ws_pending_client_calls: dict[int, asyncio.Future[list[WireMessage]]] = {}
+        self._next_server_push_id = 1  # Track server→client push IDs
+        self._next_client_import_id = 1  # Track client→server import IDs for WebSocket
+        self._ws_listener_ready = asyncio.Event()  # Signal when listener is ready
 
     async def __aenter__(self) -> Self:
         """Async context manager entry."""
         self._transport = create_transport(self.config.url, timeout=self.config.timeout)
         # Manually manage transport lifecycle - we're composing context managers
         await self._transport.__aenter__()
+
+        # Start WebSocket listener for bidirectional RPC
+        if isinstance(self._transport, WebSocketTransport):
+            self._ws_listener_task = asyncio.create_task(self._ws_listen_loop())
+            # Wait for listener to be ready before proceeding
+            await self._ws_listener_ready.wait()
+
         return self
 
     async def __aexit__(self, *args: object) -> None:
@@ -76,6 +90,12 @@ class Client(RpcSession):
 
     async def close(self) -> None:
         """Close the client connection."""
+        # Cancel WebSocket listener task
+        if self._ws_listener_task and not self._ws_listener_task.done():
+            self._ws_listener_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._ws_listener_task
+
         if self._transport:
             await self._transport.close()
             self._transport = None
@@ -111,7 +131,12 @@ class Client(RpcSession):
 
         # For HTTP batch transport, each request is a micro-session
         # Import IDs start from 1 for each batch
-        import_id = 1
+        # For WebSocket, use incrementing IDs to track concurrent calls
+        if isinstance(self._transport, WebSocketTransport):
+            import_id = self._next_client_import_id
+            self._next_client_import_id += 1
+        else:
+            import_id = 1
 
         # Build property path including method name
         full_path = (property_path or []) + [method]
@@ -138,18 +163,49 @@ class Client(RpcSession):
         batch = serialize_wire_batch([push_msg, pull_msg])
 
         try:
-            # Use transport abstraction
-            response_bytes = await self._transport.send_and_receive(
-                batch.encode("utf-8")
-            )
-            response_text = response_bytes.decode("utf-8")
+            # WebSocket bidirectional: use background listener for responses
+            if isinstance(self._transport, WebSocketTransport):
+                logger = logging.getLogger(__name__)
+                logger.debug("WebSocket call: registering import_id=%s", import_id)
 
-            if not response_text:
-                # No content - call succeeded but no response
-                return None
+                # Register future for this call
+                future: asyncio.Future[list[WireMessage]] = asyncio.Future()
+                self._ws_pending_client_calls[import_id] = future
 
-            # Parse responses
-            messages = parse_wire_batch(response_text)
+                # Send messages (background listener will receive responses)
+                logger.debug(f"Sending batch: {batch[:200]}")
+                await self._transport.send(batch.encode("utf-8"))
+
+                # Wait for background listener to complete the future (with timeout for debugging)
+                logger.debug("Waiting for response for import_id=%s", import_id)
+                try:
+                    messages = await asyncio.wait_for(future, timeout=10.0)
+                    logger.debug("Received response: %s", messages)
+                except TimeoutError:
+                    logger.error(
+                        "Timeout waiting for response for import_id=%s", import_id
+                    )
+                    logger.error(
+                        f"Pending calls: {list(self._ws_pending_client_calls.keys())}"
+                    )
+                    raise RpcError.internal(
+                        f"Timeout waiting for response for import_id={import_id}"
+                    )
+
+                # messages are already parsed Wire objects, use them directly
+
+            else:
+                # HTTP/WebTransport: use traditional send_and_receive
+                response_bytes = await self._transport.send_and_receive(
+                    batch.encode("utf-8")
+                )
+                response_text = response_bytes.decode("utf-8")
+
+                if not response_text:
+                    # No content - call succeeded but no response
+                    return None
+
+                messages = parse_wire_batch(response_text)
 
             # Process responses and extract result
             result = None
@@ -425,9 +481,14 @@ class Client(RpcSession):
         # Serialize arguments
         serialized_args = self.serializer.serialize_payload(args)
 
-        # Create pipeline expression
+        # Look up the remote export_id from our import_id
+        # The server needs to see its own export_id, not our import_id
+        remote_export_id = self._import_to_remote_export.get(import_id, import_id)
+
+        # Create pipeline expression using the remote's export_id
+        # Note: field is named import_id but holds the remote export_id
         pipeline_expr = WirePipeline(
-            import_id=import_id,
+            import_id=remote_export_id,
             property_path=path_keys,
             args=serialized_args,
         )
@@ -528,3 +589,212 @@ class Client(RpcSession):
 
         msg = "No response for pull"
         raise RpcError.internal(msg)
+
+    async def _ws_listen_loop(self) -> None:
+        """Background task to listen for incoming WebSocket messages.
+
+        This enables bidirectional RPC where the server can call methods on
+        client-side capabilities.
+        """
+        if not isinstance(self._transport, WebSocketTransport):
+            return
+
+        logger = logging.getLogger(__name__)
+        logger.debug("WebSocket listener started")
+
+        try:
+            # Signal that listener is ready
+            self._ws_listener_ready.set()
+            logger.debug("WebSocket listener ready")
+
+            while True:
+                # Receive messages from server
+                try:
+                    logger.debug("Waiting for message from server...")
+                    message_bytes = await self._transport.receive()
+                    message_text = message_bytes.decode("utf-8")
+                    logger.debug(f"Received message: {message_text[:200]}")
+
+                    # Parse and process messages
+                    messages = parse_wire_batch(message_text)
+                    responses: list[WireMessage] = []
+
+                    for msg in messages:
+                        match msg:
+                            case WirePush():
+                                # Server→Client call
+                                response = await self._handle_server_push(
+                                    msg.expression
+                                )
+                                if response:
+                                    responses.append(response)
+
+                            case WirePull():
+                                # Server requesting resolution
+                                response = await self._handle_server_pull(msg.import_id)
+                                if response:
+                                    responses.append(response)
+
+                            case WireResolve():
+                                # Response to a client→server call
+                                # Check if this is a response we're waiting for
+                                import_id = msg.export_id
+                                logger.debug(
+                                    f"WireResolve: export_id={import_id}, pending={list(self._ws_pending_client_calls.keys())}"
+                                )
+                                if import_id in self._ws_pending_client_calls:
+                                    future = self._ws_pending_client_calls.pop(
+                                        import_id
+                                    )
+                                    if not future.done():
+                                        logger.debug(
+                                            "Completing future for import_id=%s",
+                                            import_id,
+                                        )
+                                        future.set_result([msg])
+                                else:
+                                    logger.warning(
+                                        "Received WireResolve for unknown import_id=%s",
+                                        import_id,
+                                    )
+
+                            case WireReject():
+                                # Error response to a client→server call
+                                import_id = msg.export_id
+                                logger.debug(
+                                    f"WireReject: export_id={import_id}, pending={list(self._ws_pending_client_calls.keys())}"
+                                )
+                                if import_id in self._ws_pending_client_calls:
+                                    future = self._ws_pending_client_calls.pop(
+                                        import_id
+                                    )
+                                    if not future.done():
+                                        logger.debug(
+                                            "Completing future with error for import_id=%s",
+                                            import_id,
+                                        )
+                                        future.set_result([msg])
+                                else:
+                                    logger.warning(
+                                        "Received WireReject for unknown import_id=%s",
+                                        import_id,
+                                    )
+
+                    # Send responses back to server
+                    if responses:
+                        response_batch = serialize_wire_batch(responses)
+                        await self._transport.send(response_batch.encode("utf-8"))
+
+                except asyncio.CancelledError:
+                    break
+                except Exception:
+                    # Log and continue - don't break the listener on errors
+                    logger = logging.getLogger(__name__)
+                    logger.exception("Error in WebSocket listener")
+                    # Small delay to prevent tight loop on persistent errors
+                    await asyncio.sleep(0.1)
+
+        except asyncio.CancelledError:
+            pass
+
+    async def _handle_server_push(self, expression: Any) -> WireMessage | None:
+        """Handle a push message from server (server calling client method).
+
+        Args:
+            expression: The wire expression (expected to be WirePipeline)
+
+        Returns:
+            Response message or None
+        """
+        # Allocate import ID for this server→client call
+        import_id = self._next_server_push_id
+        self._next_server_push_id += 1
+
+        try:
+            if not isinstance(expression, WirePipeline):
+                msg = "Expected WirePipeline expression"
+                raise RpcError.bad_request(msg)
+
+            # Get the target from exports (client-side capabilities)
+            target_hook = self.get_export_hook(expression.import_id)
+            if target_hook is None:
+                msg = f"Export {expression.import_id} not found on client"
+                raise RpcError.not_found(msg)
+
+            # Parse arguments
+            args_payload = (
+                self.parser.parse(expression.args)
+                if expression.args is not None
+                else RpcPayload.owned([])
+            )
+
+            # Extract path
+            path: list[str | int] = [
+                str(pk.value) for pk in (expression.property_path or [])
+            ]
+
+            # Execute the call
+            result_hook = await target_hook.call(path, args_payload)
+
+            # Store result in imports so server can pull it
+            self._imports[import_id] = result_hook
+
+            # No immediate response - server will pull when ready
+            return None
+
+        except RpcError as e:
+            # Return error
+            error_expr = WireError(
+                str(e.code.value),
+                e.message,
+                None,
+                e.data if isinstance(e.data, dict) else None,
+            )
+            return WireReject(-import_id, error_expr)
+
+        except Exception as e:
+            # Internal error
+            logger = logging.getLogger(__name__)
+            logger.exception("Error handling server push: %s", e)
+            error_expr = WireError("internal", f"Internal error: {e}", None)
+            return WireReject(-import_id, error_expr)
+
+    async def _handle_server_pull(self, import_id: int) -> WireMessage | None:
+        """Handle a pull message from server (server requesting result).
+
+        Args:
+            import_id: The import ID the server wants to pull
+
+        Returns:
+            Response message or None
+        """
+        try:
+            # Get the hook from imports
+            hook = self.get_import_hook(import_id)
+            if hook is None:
+                msg = f"Import {import_id} not found on client"
+                raise RpcError.not_found(msg)
+
+            # Pull the final value
+            payload = await hook.pull()
+
+            # Serialize the result
+            serialized_value = self.serializer.serialize_payload(payload)
+
+            # Send resolution
+            return WireResolve(import_id, serialized_value)
+
+        except RpcError as e:
+            error_expr = WireError(
+                str(e.code.value),
+                e.message,
+                None,
+                e.data if isinstance(e.data, dict) else None,
+            )
+            return WireReject(import_id, error_expr)
+
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.exception("Error handling server pull: %s", e)
+            error_expr = WireError("internal", f"Internal error: {e}", None)
+            return WireReject(import_id, error_expr)

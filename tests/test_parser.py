@@ -133,7 +133,10 @@ class TestParseExport:
 
         assert isinstance(result.value["user"], RpcStub)
         assert result.value["id"] == 123
-        assert 5 in session._imports
+        # Check that the remote export_id is mapped to a local import_id
+        assert 5 in session._remote_export_to_import
+        import_id = session._remote_export_to_import[5]
+        assert import_id in session._imports
 
     def test_parse_export_in_array(self):
         """Test parsing export nested in an array."""
@@ -146,8 +149,10 @@ class TestParseExport:
         assert isinstance(result.value[0], RpcStub)
         assert isinstance(result.value[1], RpcStub)
         assert result.value[2] == {"name": "test"}
-        assert 1 in session._imports
-        assert 2 in session._imports
+        # Check that remote export_ids are mapped to local import_ids
+        assert 1 in session._remote_export_to_import
+        assert 2 in session._remote_export_to_import
+        assert len(session._imports) == 2
 
     def test_parse_multiple_exports_same_id(self):
         """Test parsing same export ID multiple times returns same import."""

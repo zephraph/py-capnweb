@@ -57,9 +57,6 @@ async def chat_server():
     await server.stop()
 
 
-@pytest.mark.skip(
-    reason="WebSocket bidirectional RPC not yet implemented - server cannot initiate calls to clients"
-)
 @pytest.mark.asyncio
 async def test_chat_basic_flow(chat_server):
     """Test basic chat flow: join, send message, leave."""
