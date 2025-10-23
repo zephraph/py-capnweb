@@ -351,7 +351,9 @@ class Server(RpcSession):
                         messages = parse_wire_batch(msg.data)
 
                         if len(messages) > self.config.max_batch_size:
-                            error = WireAbort(f"Batch size {len(messages)} exceeds maximum")
+                            error = WireAbort(
+                                f"Batch size {len(messages)} exceeds maximum"
+                            )
                             await ws.send_str(serialize_wire_batch([error]))
                             break
 
@@ -367,7 +369,9 @@ class Server(RpcSession):
                                         wire_msg.expression, import_id, ws_imports
                                     )
                                 case WirePull():
-                                    response = await self._handle_pull(wire_msg.import_id, ws_imports)
+                                    response = await self._handle_pull(
+                                        wire_msg.import_id, ws_imports
+                                    )
                                 case _:
                                     response = await self._process_message(wire_msg)
 
@@ -390,8 +394,12 @@ class Server(RpcSession):
                         messages = parse_wire_batch(msg.data.decode("utf-8"))
 
                         if len(messages) > self.config.max_batch_size:
-                            error = WireAbort(f"Batch size {len(messages)} exceeds maximum")
-                            await ws.send_bytes(serialize_wire_batch([error]).encode("utf-8"))
+                            error = WireAbort(
+                                f"Batch size {len(messages)} exceeds maximum"
+                            )
+                            await ws.send_bytes(
+                                serialize_wire_batch([error]).encode("utf-8")
+                            )
                             break
 
                         # Process messages
@@ -405,7 +413,9 @@ class Server(RpcSession):
                                         wire_msg.expression, import_id, ws_imports
                                     )
                                 case WirePull():
-                                    response = await self._handle_pull(wire_msg.import_id, ws_imports)
+                                    response = await self._handle_pull(
+                                        wire_msg.import_id, ws_imports
+                                    )
                                 case _:
                                     response = await self._process_message(wire_msg)
 
@@ -414,12 +424,16 @@ class Server(RpcSession):
 
                         # Send responses
                         if responses:
-                            response_data = serialize_wire_batch(responses).encode("utf-8")
+                            response_data = serialize_wire_batch(responses).encode(
+                                "utf-8"
+                            )
                             await ws.send_bytes(response_data)
 
                     except Exception as e:
                         error = WireAbort(f"Error processing message: {e}")
-                        await ws.send_bytes(serialize_wire_batch([error]).encode("utf-8"))
+                        await ws.send_bytes(
+                            serialize_wire_batch([error]).encode("utf-8")
+                        )
 
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     logger = logging.getLogger(__name__)

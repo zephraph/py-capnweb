@@ -13,7 +13,7 @@ A complete Python implementation of the [Cap'n Web protocol](https://github.com/
 - **Bidirectional RPC** - Peer-to-peer capability passing
 - **100% Interoperable** - Fully compatible with TypeScript reference implementation
 
-**Production-Ready:**
+**Beta-Testing-Ready":**
 - 352 tests passing, 76% coverage
 - 0 linting errors, 0 typing errors
 - Hook-based architecture (clean, maintainable)
@@ -93,9 +93,9 @@ async with Client(config) as client:
 ## Current Status (v0.4.0)
 
 **Transports:**
-- ✅ HTTP Batch (production-ready)
+- ✅ HTTP Batch
 - ⚠️ WebSocket (partial support - client→server RPC only, bidirectional RPC in progress)
-- ✅ WebTransport/HTTP/3 (production-ready, requires aioquic)
+- ✅ WebTransport/HTTP/3 (requires aioquic)
 
 **Protocol Features:**
 - ✅ Wire protocol (all message types)
@@ -151,7 +151,7 @@ Use HTTP Batch transport instead - it supports full bidirectional RPC including:
 - See `examples/peer_to_peer/` for working bidirectional RPC example
 
 **WebTransport:**
-- Full bidirectional support (production-ready)
+- Full bidirectional support
 - Requires `aioquic` library: `pip install capnweb[webtransport]`
 
 ## Development

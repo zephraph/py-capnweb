@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2025-10-23
+
+### Added
+- **WebSocket Server Endpoint** - Server now accepts WebSocket connections at `/rpc/ws`
+  - Implements request-response RPC pattern (client→server calls)
+  - Maintains session-specific import tables for connection lifetime
+  - Automatic resource cleanup on disconnect
+
+### Fixed
+- **WebSocket endpoint registration** - Fixed bug where `/rpc/ws` was advertised but not implemented
+  - Server was only registering `/rpc/batch`, causing 404 errors for WebSocket clients
+  - Chat example and other WebSocket-based code now successfully connects to server
+
+### Changed
+- **WebSocket Limitation Documentation** - Clarified current WebSocket capabilities
+- **Test Status** - Re-skipped chat example tests with accurate reason
+- WebSocket transport supports client→server RPC but not server→client (bidirectional)
+- For bidirectional RPC, use HTTP Batch or WebTransport transports
+- Chat example remains non-functional pending bidirectional WebSocket implementation
+
 ## [0.4.0] - 2025-10-02
 
 ### Added
@@ -15,7 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `examples/actor-system/` - Distributed actor system with supervisor/worker pattern
 - **Tests**
   - 12 new WebTransport unit tests in `tests/test_webtransport.py`
-  - All 352 tests passing (up from 329, +23 tests)
 - **Documentation**
   - Complete READMEs for all new examples
   - WebTransport vs WebSocket comparison
@@ -36,14 +55,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - API Reference (`docs/api-reference.md`) - Complete API documentation
   - Documentation Index (`docs/README.md`) - Central documentation hub
 - **Comprehensive test coverage improvements across core modules**
-  - `session.py` - 44% → 99% coverage (+31 tests)
-  - `stubs.py` - 58% → 100% coverage (+26 tests)
-  - `parser.py` - 47% → 98% coverage (+30 tests)
-  - `hooks.py` - 54% → 86% coverage (+36 tests)
-  - `serializer.py` - 68% → 100% coverage (+26 tests)
-  - `payload.py` - 84% → 100% coverage (+23 tests)
-  - 172 new tests added (329 total, up from 179)
-  - Test coverage now at 85% overall (up from 67%)
 
 ### Changed
 - Improved code quality and reduced cyclomatic complexity in 8 functions
@@ -53,10 +64,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - **Legacy code cleanup** - removed monolithic evaluator and table abstractions
-- `evaluator.py` (286 lines, 31% coverage) - replaced by parser + serializer + hooks
-- `tables.py` (82 lines, 0% coverage) - replaced by RpcSession
-- `test_remap_evaluation.py` - tests for removed evaluator
-- `test_tables.py` - tests for removed tables module
 - Architecture now fully hook-based with no legacy code paths
 
 ## [0.3.0] - 2025-10-01
@@ -111,11 +118,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Core protocol types (IDs, errors, wire format)
 - Basic RPC framework
 - Documentation and examples
-
-[Unreleased]: https://github.com/abilian/capn-python/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/abilian/capn-python/compare/v0.3.1...v0.4.0
-[0.3.1]: https://github.com/abilian/capn-python/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/abilian/capn-python/compare/v0.2.1...v0.3.0
-[0.2.1]: https://github.com/abilian/capn-python/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/abilian/capn-python/releases/tag/v0.2.0
-[0.1.0]: https://github.com/abilian/capn-python/releases/tag/v0.1.0
