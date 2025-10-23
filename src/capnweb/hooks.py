@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from abc import ABC, abstractmethod
 from contextlib import suppress
 from dataclasses import dataclass
@@ -524,10 +525,8 @@ class RpcImportHook(StubHook):
         Returns:
             A PromiseStubHook for the result
         """
-        import logging
-
         logger = logging.getLogger(__name__)
-        logger.debug(f"RpcImportHook.call: import_id={self.import_id}, path={path}")
+        logger.debug("RpcImportHook.call: import_id=%s, path=%s", self.import_id, path)
 
         # Create a new import ID for the result
         result_import_id = self.session.allocate_import_id()

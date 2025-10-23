@@ -550,45 +550,10 @@ class Server(RpcSession):
                 await ws.send_str(serialize_wire_batch([error]))
                 return next_push_id
 
-            # Process messages
-            responses: list[WireMessage] = []
-            push_count = 0
-
-            for wire_msg in messages:
-                match wire_msg:
-                    case WirePush():
-                        # Client→Server call
-                        import_id = next_push_id + push_count
-                        push_count += 1
-                        response = await self._handle_ws_push(
-                            wire_msg.expression, import_id, session
-                        )
-                        if response:
-                            responses.append(response)
-
-                    case WirePull():
-                        # Client requests resolution
-                        response = await self._handle_ws_pull(
-                            wire_msg.import_id, session
-                        )
-                        if response:
-                            responses.append(response)
-
-                    case WireResolve():
-                        # Client resolving a server→client call
-                        session.handle_resolve(wire_msg.export_id, wire_msg.value)
-
-                    case WireReject():
-                        # Client rejecting a server→client call
-                        session.handle_reject(wire_msg.export_id, wire_msg.error)
-
-                    case WireRelease():
-                        # Client releasing an import
-                        response = await self._handle_release(
-                            ImportId(wire_msg.import_id), wire_msg.refcount
-                        )
-                        if response:
-                            responses.append(response)
+            # Process messages and collect responses
+            responses, push_count = await self._handle_ws_messages(
+                messages, next_push_id, session
+            )
 
             # Send responses back over WebSocket
             if responses:
@@ -604,6 +569,61 @@ class Server(RpcSession):
             error = WireAbort(f"Error processing message: {e}")
             await ws.send_str(serialize_wire_batch([error]))
             return next_push_id
+
+    async def _handle_ws_messages(
+        self,
+        messages: list[WireMessage],
+        next_push_id: int,
+        session: WebSocketServerSession,
+    ) -> tuple[list[WireMessage], int]:
+        """Handle a batch of WebSocket messages.
+
+        Args:
+            messages: List of wire messages to process
+            next_push_id: Next push ID for client→server calls
+            session: WebSocket session
+
+        Returns:
+            Tuple of (responses, push_count)
+        """
+        responses: list[WireMessage] = []
+        push_count = 0
+
+        for wire_msg in messages:
+            match wire_msg:
+                case WirePush():
+                    # Client→Server call
+                    import_id = next_push_id + push_count
+                    push_count += 1
+                    response = await self._handle_ws_push(
+                        wire_msg.expression, import_id, session
+                    )
+                    if response:
+                        responses.append(response)
+
+                case WirePull():
+                    # Client requests resolution
+                    response = await self._handle_ws_pull(wire_msg.import_id, session)
+                    if response:
+                        responses.append(response)
+
+                case WireResolve():
+                    # Client resolving a server→client call
+                    session.handle_resolve(wire_msg.export_id, wire_msg.value)
+
+                case WireReject():
+                    # Client rejecting a server→client call
+                    session.handle_reject(wire_msg.export_id, wire_msg.error)
+
+                case WireRelease():
+                    # Client releasing an import
+                    response = await self._handle_release(
+                        ImportId(wire_msg.import_id), wire_msg.refcount
+                    )
+                    if response:
+                        responses.append(response)
+
+        return responses, push_count
 
     async def _handle_ws_push(
         self, expression: Any, import_id: int, session: WebSocketServerSession
