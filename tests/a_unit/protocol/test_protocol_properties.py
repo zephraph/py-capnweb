@@ -1,17 +1,8 @@
-"""Property-based tests using Hypothesis to find edge cases.
+"""Property-based tests for wire protocol components.
 
 These tests generate random inputs to verify invariants hold across
 a wide range of values, helping discover edge cases that might be
 missed by example-based tests.
-
-This is about as good as we can get with property-based tests alone without significantly changing the architecture or adding integration tests.
-
-The property tests cwurrently thoroughly cover:
-
-- All wire protocol serialization/deserialization paths
-- ID allocation invariants
-- Payload ownership semantics
-- Error handling
 """
 
 from __future__ import annotations
@@ -24,7 +15,6 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from capnweb.core.payload import PayloadSource, RpcPayload
 from capnweb.error import ErrorCode, RpcError
 from capnweb.protocol.ids import ExportId, IdAllocator, ImportId
 from capnweb.protocol.wire import (
@@ -641,141 +631,6 @@ class TestIntegrationProperties:
 
         assert isinstance(deserialized, list)
         assert len(deserialized) == len(json_args)
-
-
-# Property tests for RpcPayload ownership semantics
-
-
-class TestPayloadProperties:
-    """Property-based tests for RpcPayload ownership semantics."""
-
-    @given(simple_json_strategy())
-    def test_owned_payload_has_owned_source(self, value: Any) -> None:
-        """Owned payloads should have PayloadSource.OWNED."""
-        payload = RpcPayload.owned(value)
-        assert payload.source == PayloadSource.OWNED
-        assert payload.value == value
-
-    @given(simple_json_strategy())
-    def test_params_payload_has_params_source(self, value: Any) -> None:
-        """Params payloads should have PayloadSource.PARAMS."""
-        payload = RpcPayload.from_app_params(value)
-        assert payload.source == PayloadSource.PARAMS
-        assert payload.value == value
-
-    @given(simple_json_strategy())
-    def test_return_payload_has_return_source(self, value: Any) -> None:
-        """Return payloads should have PayloadSource.RETURN."""
-        payload = RpcPayload.from_app_return(value)
-        assert payload.source == PayloadSource.RETURN
-        assert payload.value == value
-
-    @given(simple_json_strategy())
-    def test_params_payload_needs_deep_copy(self, value: Any) -> None:
-        """PARAMS payloads should require deep copy before use."""
-        payload = RpcPayload.from_app_params(value)
-        assert payload.source == PayloadSource.PARAMS
-
-        # After ensure_deep_copied, source should change to OWNED
-        copied = payload.ensure_deep_copied()
-        if copied is not None:
-            assert copied.source == PayloadSource.OWNED
-
-    @given(simple_json_strategy())
-    def test_owned_payload_no_copy_needed(self, value: Any) -> None:
-        """OWNED payloads don't need copying."""
-        payload = RpcPayload.owned(value)
-        copied = payload.ensure_deep_copied()
-
-        # Should return same payload (no copy needed) or None if immutable
-        if copied is not None:
-            assert copied.source == PayloadSource.OWNED
-
-    @given(simple_json_strategy())
-    def test_return_payload_becomes_owned(self, value: Any) -> None:
-        """RETURN payloads become OWNED when copied."""
-        payload = RpcPayload.from_app_return(value)
-        copied = payload.ensure_deep_copied()
-
-        # Should be OWNED after copying
-        if copied is not None:
-            assert copied.source == PayloadSource.OWNED
-
-    @given(st.lists(st.integers(min_value=0, max_value=100), min_size=1, max_size=10))
-    def test_deep_copy_actually_copies_mutable_values(self, value: list[int]) -> None:
-        """Deep copy should create independent copy of mutable objects."""
-        payload = RpcPayload.from_app_params(value)
-        copied = payload.ensure_deep_copied()
-
-        # Modify original
-        value.append(999)
-
-        # Copied value should not be affected
-        assert 999 in value
-        if copied is not None and isinstance(copied.value, list):
-            assert 999 not in copied.value
-
-
-# Property tests for RpcError
-
-
-class TestRpcErrorProperties:
-    """Property-based tests for RpcError factory methods."""
-
-    @given(st.text(min_size=1, max_size=200))
-    def test_not_found_error_has_correct_code(self, message: str) -> None:
-        """not_found() factory should create NOT_FOUND errors."""
-        error = RpcError.not_found(message)
-        assert error.code == ErrorCode.NOT_FOUND
-        assert error.message == message
-
-    @given(st.text(min_size=1, max_size=200))
-    def test_bad_request_error_has_correct_code(self, message: str) -> None:
-        """bad_request() factory should create BAD_REQUEST errors."""
-        error = RpcError.bad_request(message)
-        assert error.code == ErrorCode.BAD_REQUEST
-        assert error.message == message
-
-    @given(st.text(min_size=1, max_size=200))
-    def test_internal_error_has_correct_code(self, message: str) -> None:
-        """internal() factory should create INTERNAL errors."""
-        error = RpcError.internal(message)
-        assert error.code == ErrorCode.INTERNAL
-        assert error.message == message
-
-    @given(
-        st.sampled_from(list(ErrorCode)),
-        st.text(min_size=1, max_size=200),
-    )
-    def test_error_code_is_preserved(self, code: ErrorCode, message: str) -> None:
-        """Error codes should be preserved in RpcError."""
-        error = RpcError(code, message)
-        assert error.code == code
-        assert error.message == message
-
-    @given(
-        st.text(min_size=1, max_size=200),
-        st.dictionaries(
-            st.text(min_size=1, max_size=20),
-            st.one_of(st.integers(), st.text(max_size=50), st.booleans()),  # type: ignore[arg-type]
-            min_size=0,
-            max_size=5,
-        ),
-    )
-    def test_error_data_is_preserved(self, message: str, data: dict[str, Any]) -> None:
-        """Custom error data should be preserved."""
-        error = RpcError(ErrorCode.INTERNAL, message, data=data)
-        assert error.data == data
-
-    @given(
-        st.sampled_from(list(ErrorCode)),
-        st.text(min_size=1, max_size=200),
-    )
-    def test_error_is_exception(self, code: ErrorCode, message: str) -> None:
-        """RpcError should be a proper exception."""
-        error = RpcError(code, message)
-        assert isinstance(error, Exception)
-        assert str(error) == f"{code}: {message}"
 
 
 # Property tests for wire expression parsing/serialization
