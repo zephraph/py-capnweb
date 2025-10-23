@@ -112,7 +112,8 @@ python client.py
 One of Cap'n Web's most powerful features is **promise pipelining** - batching multiple dependent calls into a single network round-trip:
 
 ```python
-from capnweb.pipeline import PipelineBatch
+from capnweb.core.pipeline import PipelineBatch
+
 
 async def pipeline_example():
     config = ClientConfig(url="http://127.0.0.1:8080/rpc/batch")
@@ -122,9 +123,9 @@ async def pipeline_example():
         batch = PipelineBatch(client, capability_id=0)
 
         # Queue multiple calls - they execute in one round-trip!
-        call1 = batch.call("add", [10, 20])      # Returns a promise
-        call2 = batch.call("multiply", [5, 6])    # Returns a promise
-        call3 = batch.call("add", [100, 200])     # Returns a promise
+        call1 = batch.call("add", [10, 20])  # Returns a promise
+        call2 = batch.call("multiply", [5, 6])  # Returns a promise
+        call3 = batch.call("add", [100, 200])  # Returns a promise
 
         # Execute the batch (single network request)
         await batch.execute()

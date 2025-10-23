@@ -20,7 +20,7 @@ async def webtransport_certs():
     proc = await asyncio.create_subprocess_exec(sys.executable, str(cert_script_path))
     await proc.wait()
     assert proc.returncode == 0, "Certificate generation script failed"
-    yield
+    return
     # No cleanup needed for certs
 
 
@@ -46,13 +46,11 @@ async def webtransport_server(webtransport_certs):
 @pytest.fixture(scope="module")
 async def webtransport_integrated_certs():
     """Generate certificates for the integrated webtransport example."""
-    cert_script_path = (
-        examples_dir / "webtransport-integrated" / "generate_certs.py"
-    )
+    cert_script_path = examples_dir / "webtransport-integrated" / "generate_certs.py"
     proc = await asyncio.create_subprocess_exec(sys.executable, str(cert_script_path))
     await proc.wait()
     assert proc.returncode == 0, "Certificate generation script failed"
-    yield
+    return
 
 
 @pytest.fixture
@@ -72,7 +70,9 @@ async def webtransport_integrated_server(webtransport_integrated_certs):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="WebTransport has protocol issues with self-signed certs in test environment")
+@pytest.mark.xfail(
+    reason="WebTransport has protocol issues with self-signed certs in test environment"
+)
 async def test_webtransport_standalone_example(webtransport_server):
     """Tests the standalone WebTransport example."""
     client_path = examples_dir / "webtransport" / "client.py"
@@ -87,7 +87,7 @@ async def test_webtransport_standalone_example(webtransport_server):
         stdout, stderr = await asyncio.wait_for(
             client_process.communicate(), timeout=20
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         client_process.kill()
         stdout, stderr = await client_process.communicate()
         pytest.fail("Client process timed out.")
@@ -106,7 +106,9 @@ async def test_webtransport_standalone_example(webtransport_server):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="WebTransport has protocol issues with self-signed certs in test environment")
+@pytest.mark.xfail(
+    reason="WebTransport has protocol issues with self-signed certs in test environment"
+)
 async def test_webtransport_integrated_example(webtransport_integrated_server):
     """Tests the integrated WebTransport example."""
     client_path = examples_dir / "webtransport-integrated" / "client.py"
@@ -121,7 +123,7 @@ async def test_webtransport_integrated_example(webtransport_integrated_server):
         stdout, stderr = await asyncio.wait_for(
             client_process.communicate(), timeout=20
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         client_process.kill()
         stdout, stderr = await client_process.communicate()
         pytest.fail("Client process timed out.")

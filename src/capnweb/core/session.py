@@ -10,17 +10,17 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-from capnweb.hooks import (
+from capnweb.core.hooks import (
     PromiseStubHook,
     RpcImportHook,
     StubHook,
     TargetStubHook,
 )
-from capnweb.parser import Parser
-from capnweb.serializer import Serializer
+from capnweb.core.parser import Parser
+from capnweb.core.serializer import Serializer
 
 if TYPE_CHECKING:
-    from capnweb.stubs import RpcPromise, RpcStub
+    from capnweb.core.stubs import RpcPromise, RpcStub
     from capnweb.types import RpcTarget
 
 

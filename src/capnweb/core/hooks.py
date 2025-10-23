@@ -21,11 +21,11 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Self
 
+from capnweb.core.payload import RpcPayload
 from capnweb.error import RpcError
-from capnweb.payload import RpcPayload
 
 if TYPE_CHECKING:
-    from capnweb.session import RpcSession
+    from capnweb.core.session import RpcSession
     from capnweb.types import RpcTarget
 
 

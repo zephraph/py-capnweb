@@ -8,21 +8,15 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Self
 
+from capnweb.core.hooks import ErrorStubHook, PayloadStubHook, TargetStubHook
+from capnweb.core.payload import RpcPayload
+from capnweb.core.pipeline import PendingCall, PipelineBatch, PipelinePromise
+from capnweb.core.resume import ResumeToken  # noqa: TC001
+from capnweb.core.session import RpcSession
+from capnweb.core.stubs import RpcStub
 from capnweb.error import ErrorCode, RpcError
-from capnweb.hooks import ErrorStubHook, PayloadStubHook, TargetStubHook
-from capnweb.ids import ExportId
-from capnweb.payload import RpcPayload
-from capnweb.pipeline import PendingCall, PipelineBatch, PipelinePromise
-from capnweb.resume import ResumeToken  # noqa: TC001
-from capnweb.session import RpcSession
-from capnweb.stubs import RpcStub
-from capnweb.transports import (
-    HttpBatchTransport,
-    WebSocketTransport,
-    WebTransportTransport,
-    create_transport,
-)
-from capnweb.wire import (
+from capnweb.protocol.ids import ExportId
+from capnweb.protocol.wire import (
     PropertyKey,
     WireAbort,
     WireError,
@@ -35,6 +29,12 @@ from capnweb.wire import (
     WireResolve,
     parse_wire_batch,
     serialize_wire_batch,
+)
+from capnweb.transport.transports import (
+    HttpBatchTransport,
+    WebSocketTransport,
+    WebTransportTransport,
+    create_transport,
 )
 
 if TYPE_CHECKING:

@@ -10,17 +10,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol
 
-from capnweb.error import ErrorCode, RpcError
-from capnweb.hooks import (
+from capnweb.core.hooks import (
     ErrorStubHook,
 )
-from capnweb.payload import RpcPayload
-from capnweb.stubs import RpcPromise, RpcStub
-from capnweb.wire import WireError, WireExport
-from capnweb.wire import WirePromise as WirePromiseType
+from capnweb.core.payload import RpcPayload
+from capnweb.core.stubs import RpcPromise, RpcStub
+from capnweb.error import ErrorCode, RpcError
+from capnweb.protocol.wire import WireError, WireExport
+from capnweb.protocol.wire import WirePromise as WirePromiseType
 
 if TYPE_CHECKING:
-    from capnweb.hooks import StubHook
+    from capnweb.core.hooks import StubHook
 
 
 class Importer(Protocol):

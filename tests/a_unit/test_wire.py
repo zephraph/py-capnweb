@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from capnweb.wire import (
+from capnweb.protocol.wire import (
     PropertyKey,
     WireDate,
     WireError,

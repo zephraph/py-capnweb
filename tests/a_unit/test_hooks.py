@@ -4,8 +4,7 @@ import asyncio
 
 import pytest
 
-from capnweb.error import RpcError
-from capnweb.hooks import (
+from capnweb.core.hooks import (
     ChainedImportHook,
     ErrorStubHook,
     PayloadStubHook,
@@ -13,8 +12,9 @@ from capnweb.hooks import (
     RpcImportHook,
     TargetStubHook,
 )
-from capnweb.payload import RpcPayload
-from capnweb.session import RpcSession
+from capnweb.core.payload import RpcPayload
+from capnweb.core.session import RpcSession
+from capnweb.error import RpcError
 from capnweb.types import RpcTarget
 
 

@@ -11,9 +11,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from capnweb.error import RpcError
-from capnweb.ids import ImportId
-from capnweb.transports import create_transport
-from capnweb.wire import (
+from capnweb.protocol.ids import ImportId
+from capnweb.protocol.wire import (
     PropertyKey,
     WireMessage,
     WirePipeline,
@@ -24,6 +23,7 @@ from capnweb.wire import (
     parse_wire_batch,
     serialize_wire_batch,
 )
+from capnweb.transport.transports import create_transport
 
 if TYPE_CHECKING:
     from capnweb.client import Client

@@ -82,7 +82,9 @@ async def test_peer_to_peer_example():
         assert "🚀 Starting Bob" in bob_stdout_str
         assert "Connecting to Alice" in bob_stdout_str
         assert "Bob calls Alice.greet()" in bob_stdout_str
-        assert "Hello! I'm Alice" in bob_stdout_str  # Bob successfully got Alice's response
+        assert (
+            "Hello! I'm Alice" in bob_stdout_str
+        )  # Bob successfully got Alice's response
         assert not bob_stderr.decode(), "Bob should have no stderr output"
 
     finally:

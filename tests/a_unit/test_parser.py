@@ -2,12 +2,12 @@
 
 import pytest
 
+from capnweb.core.hooks import ErrorStubHook, PayloadStubHook, TargetStubHook
+from capnweb.core.parser import Parser
+from capnweb.core.payload import RpcPayload
+from capnweb.core.session import RpcSession
+from capnweb.core.stubs import RpcPromise, RpcStub
 from capnweb.error import ErrorCode
-from capnweb.hooks import ErrorStubHook, PayloadStubHook, TargetStubHook
-from capnweb.parser import Parser
-from capnweb.payload import RpcPayload
-from capnweb.session import RpcSession
-from capnweb.stubs import RpcPromise, RpcStub
 from capnweb.types import RpcTarget
 
 

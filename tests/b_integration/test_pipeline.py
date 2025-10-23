@@ -6,8 +6,8 @@ from typing import Any
 import pytest
 
 from capnweb.client import Client, ClientConfig
+from capnweb.core.pipeline import PipelinePromise
 from capnweb.error import RpcError
-from capnweb.pipeline import PipelinePromise
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 

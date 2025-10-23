@@ -8,7 +8,7 @@ import aiohttp
 import pytest
 
 from capnweb import RpcTarget
-from capnweb.transports import WebSocketTransport, create_transport
+from capnweb.transport.transports import WebSocketTransport, create_transport
 
 
 class EchoTarget(RpcTarget):

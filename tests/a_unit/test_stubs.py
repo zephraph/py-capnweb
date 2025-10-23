@@ -5,10 +5,10 @@ import operator
 
 import pytest
 
+from capnweb.core.hooks import ErrorStubHook, PayloadStubHook, PromiseStubHook
+from capnweb.core.payload import RpcPayload
+from capnweb.core.stubs import RpcPromise, RpcStub
 from capnweb.error import RpcError
-from capnweb.hooks import ErrorStubHook, PayloadStubHook, PromiseStubHook
-from capnweb.payload import RpcPayload
-from capnweb.stubs import RpcPromise, RpcStub
 
 
 class TestRpcStubBasics:

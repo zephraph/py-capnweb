@@ -11,10 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from capnweb.core.payload import RpcPayload
+from capnweb.core.stubs import RpcPromise, RpcStub
 from capnweb.error import RpcError
-from capnweb.payload import RpcPayload
-from capnweb.stubs import RpcPromise, RpcStub
-from capnweb.wire import WireError, WireExport, WirePromise
+from capnweb.protocol.wire import WireError, WireExport, WirePromise
 
 
 class Exporter(Protocol):

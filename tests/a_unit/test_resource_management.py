@@ -5,16 +5,16 @@ import asyncio
 import pytest
 
 from capnweb.client import Client, ClientConfig
-from capnweb.error import RpcError
-from capnweb.hooks import (
+from capnweb.core.hooks import (
     ErrorStubHook,
     PayloadStubHook,
     PromiseStubHook,
     TargetStubHook,
 )
-from capnweb.payload import RpcPayload
+from capnweb.core.payload import RpcPayload
+from capnweb.core.stubs import RpcPromise, RpcStub
+from capnweb.error import RpcError
 from capnweb.server import Server, ServerConfig
-from capnweb.stubs import RpcPromise, RpcStub
 from capnweb.types import RpcTarget
 
 

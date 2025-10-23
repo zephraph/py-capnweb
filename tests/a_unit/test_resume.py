@@ -6,9 +6,9 @@ from typing import Any
 import pytest
 
 from capnweb.client import Client, ClientConfig
+from capnweb.core.resume import ResumeToken, ResumeTokenManager
 from capnweb.error import RpcError
-from capnweb.ids import ExportId
-from capnweb.resume import ResumeToken, ResumeTokenManager
+from capnweb.protocol.ids import ExportId
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 

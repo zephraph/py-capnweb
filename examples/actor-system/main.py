@@ -10,7 +10,7 @@ Run (after starting supervisor.py):
 import asyncio
 
 from capnweb.client import Client, ClientConfig
-from capnweb.hooks import RpcImportHook
+from capnweb.core.hooks import RpcImportHook
 
 
 async def main() -> None:

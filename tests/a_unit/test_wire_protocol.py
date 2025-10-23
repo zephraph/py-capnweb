@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from capnweb.wire import (
+from capnweb.protocol.wire import (
     WireCapture,
     WireError,
     WireImport,

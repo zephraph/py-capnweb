@@ -6,7 +6,7 @@ a capability-based RPC system with promise pipelining.
 
 from capnweb.client import Client, ClientConfig
 from capnweb.error import ErrorCode, RpcError
-from capnweb.ids import ExportId, IdAllocator, ImportId
+from capnweb.protocol.ids import ExportId, IdAllocator, ImportId
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 

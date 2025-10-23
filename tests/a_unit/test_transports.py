@@ -2,7 +2,11 @@
 
 import pytest
 
-from capnweb.transports import HttpBatchTransport, WebSocketTransport, create_transport
+from capnweb.transport.transports import (
+    HttpBatchTransport,
+    WebSocketTransport,
+    create_transport,
+)
 
 
 class TestTransportFactory:

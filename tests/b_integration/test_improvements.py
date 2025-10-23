@@ -4,9 +4,9 @@ import pytest
 
 from capnweb.client import Client, ClientConfig
 from capnweb.error import RpcError
+from capnweb.protocol.wire import WireError
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
-from capnweb.wire import WireError
 
 
 class TestWireErrorEnhancements:

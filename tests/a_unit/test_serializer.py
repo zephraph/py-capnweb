@@ -1,11 +1,11 @@
 """Tests for Serializer - Python object to wire format conversion."""
 
+from capnweb.core.hooks import PayloadStubHook
+from capnweb.core.payload import RpcPayload
+from capnweb.core.serializer import Serializer
+from capnweb.core.session import RpcSession
+from capnweb.core.stubs import RpcPromise, RpcStub
 from capnweb.error import ErrorCode, RpcError
-from capnweb.hooks import PayloadStubHook
-from capnweb.payload import RpcPayload
-from capnweb.serializer import Serializer
-from capnweb.session import RpcSession
-from capnweb.stubs import RpcPromise, RpcStub
 
 
 class TestSerializerPrimitives:

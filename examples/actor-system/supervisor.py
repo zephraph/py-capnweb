@@ -12,10 +12,10 @@ from typing import Any
 
 from worker import Worker
 
+from capnweb.core.hooks import TargetStubHook
+from capnweb.core.stubs import RpcStub
 from capnweb.error import RpcError
-from capnweb.hooks import TargetStubHook
 from capnweb.server import Server, ServerConfig
-from capnweb.stubs import RpcStub
 from capnweb.types import RpcTarget
 
 

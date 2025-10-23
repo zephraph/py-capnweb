@@ -12,7 +12,7 @@ import aiohttp
 
 # Optional WebTransport support
 try:
-    from capnweb.webtransport import WebTransportClient
+    from capnweb.transport.webtransport import WebTransportClient
 
     WEBTRANSPORT_AVAILABLE = True
 except ImportError:

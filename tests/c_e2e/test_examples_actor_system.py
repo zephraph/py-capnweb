@@ -50,7 +50,7 @@ async def test_actor_system_example(supervisor_server):
         stdout, stderr = await asyncio.wait_for(
             client_process.communicate(), timeout=15
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         client_process.kill()
         stdout, stderr = await client_process.communicate()
         pytest.fail("Client process timed out.")

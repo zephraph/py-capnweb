@@ -24,10 +24,10 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from capnweb.core.payload import PayloadSource, RpcPayload
 from capnweb.error import ErrorCode, RpcError
-from capnweb.ids import ExportId, IdAllocator, ImportId
-from capnweb.payload import PayloadSource, RpcPayload
-from capnweb.wire import (
+from capnweb.protocol.ids import ExportId, IdAllocator, ImportId
+from capnweb.protocol.wire import (
     PropertyKey,
     WireAbort,
     WireCapture,

@@ -6,8 +6,8 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from capnweb.hooks import StubHook
-    from capnweb.stubs import RpcPromise, RpcStub
+    from capnweb.core.hooks import StubHook
+    from capnweb.core.stubs import RpcPromise, RpcStub
 
 
 class PayloadSource(Enum):
@@ -145,7 +145,7 @@ class RpcPayload:
             A deep copy with all RPC references tracked
         """
         # Import here to avoid circular dependency
-        from capnweb.stubs import RpcPromise, RpcStub  # noqa: PLC0415
+        from capnweb.core.stubs import RpcPromise, RpcStub  # noqa: PLC0415
 
         # Handle RpcStub and RpcPromise specially - don't copy them,
         # but track them and duplicate their hooks
@@ -199,7 +199,7 @@ class RpcPayload:
             parent: The parent container (for promise tracking)
             key: The key/index in parent (for promise tracking)
         """
-        from capnweb.stubs import RpcPromise, RpcStub  # noqa: PLC0415
+        from capnweb.core.stubs import RpcPromise, RpcStub  # noqa: PLC0415
 
         match obj:
             case RpcStub():

@@ -2,7 +2,7 @@
 
 import threading
 
-from capnweb.ids import ExportId, IdAllocator, ImportId
+from capnweb.protocol.ids import ExportId, IdAllocator, ImportId
 
 
 class TestImportId:

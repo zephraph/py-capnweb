@@ -10,10 +10,10 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any, Self
 
-from capnweb.payload import RpcPayload
+from capnweb.core.payload import RpcPayload
 
 if TYPE_CHECKING:
-    from capnweb.hooks import StubHook
+    from capnweb.core.hooks import StubHook
 
 
 class RpcStub:
@@ -87,7 +87,7 @@ class RpcStub:
 
         future = asyncio.ensure_future(do_call())
 
-        from capnweb.hooks import PromiseStubHook  # noqa: PLC0415
+        from capnweb.core.hooks import PromiseStubHook  # noqa: PLC0415
 
         return RpcPromise(PromiseStubHook(future))
 
@@ -181,7 +181,7 @@ class RpcPromise:
 
         future = asyncio.ensure_future(do_call())
 
-        from capnweb.hooks import PromiseStubHook  # noqa: PLC0415
+        from capnweb.core.hooks import PromiseStubHook  # noqa: PLC0415
 
         return RpcPromise(PromiseStubHook(future))
 

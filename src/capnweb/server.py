@@ -14,13 +14,13 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 import aiohttp
 from aiohttp import web
 
+from capnweb.core.hooks import ErrorStubHook, PromiseStubHook, StubHook
+from capnweb.core.payload import RpcPayload
+from capnweb.core.resume import ResumeToken, ResumeTokenManager
+from capnweb.core.session import RpcSession
 from capnweb.error import ErrorCode, RpcError
-from capnweb.hooks import ErrorStubHook, PromiseStubHook, StubHook
-from capnweb.ids import ImportId
-from capnweb.payload import RpcPayload
-from capnweb.resume import ResumeToken, ResumeTokenManager
-from capnweb.session import RpcSession
-from capnweb.wire import (
+from capnweb.protocol.ids import ImportId
+from capnweb.protocol.wire import (
     PropertyKey,
     WireAbort,
     WireError,
@@ -37,7 +37,7 @@ from capnweb.wire import (
 
 # Optional WebTransport support
 try:
-    from capnweb.webtransport import WebTransportServer
+    from capnweb.transport.webtransport import WebTransportServer
 
     WEBTRANSPORT_AVAILABLE = True
 except ImportError:

@@ -3,10 +3,10 @@
 import copy
 from dataclasses import dataclass
 
-from capnweb.hooks import PayloadStubHook
-from capnweb.payload import PayloadSource, RpcPayload
-from capnweb.session import RpcSession
-from capnweb.stubs import RpcPromise, RpcStub
+from capnweb.core.hooks import PayloadStubHook
+from capnweb.core.payload import PayloadSource, RpcPayload
+from capnweb.core.session import RpcSession
+from capnweb.core.stubs import RpcPromise, RpcStub
 
 
 class TestPayloadCreation:

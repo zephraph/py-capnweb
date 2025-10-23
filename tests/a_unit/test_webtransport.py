@@ -13,12 +13,12 @@ import pytest
 from capnweb.certs import (
     generate_self_signed_cert,
 )
-from capnweb.transports import (
+from capnweb.transport.transports import (
     HttpBatchTransport,
     WebTransportTransport,
     create_transport,
 )
-from capnweb.webtransport import (
+from capnweb.transport.webtransport import (
     WebTransportClient,
     WebTransportClientProtocol,
     WebTransportServer,

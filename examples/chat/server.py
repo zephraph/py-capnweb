@@ -23,7 +23,7 @@ from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 
 if TYPE_CHECKING:
-    from capnweb.stubs import RpcStub
+    from capnweb.core.stubs import RpcStub
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

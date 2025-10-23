@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any
 
 from capnweb.error import RpcError
+from capnweb.transport.webtransport import WebTransportServer
 from capnweb.types import RpcTarget
-from capnweb.webtransport import WebTransportServer
 
 logging.basicConfig(
     level=logging.INFO,

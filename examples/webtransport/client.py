@@ -18,7 +18,7 @@ import asyncio
 import logging
 import traceback
 
-from capnweb.webtransport import WebTransportClient
+from capnweb.transport.webtransport import WebTransportClient
 
 logging.basicConfig(
     level=logging.INFO,
