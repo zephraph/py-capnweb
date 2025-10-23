@@ -16,7 +16,7 @@ from capnweb.client import Client, ClientConfig
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 
-examples_dir = Path(__file__).parent.parent / "examples" / "chat"
+examples_dir = Path(__file__).parent.parent.parent / "examples" / "chat"
 sys.path.insert(0, str(examples_dir))
 
 from server import ChatRoom  # noqa: E402  # type: ignore[import-not-found]

@@ -14,7 +14,7 @@ from capnweb.client import Client, ClientConfig
 from capnweb.error import RpcError
 from capnweb.server import Server, ServerConfig
 
-examples_dir = Path(__file__).parent.parent / "examples" / "microservices"
+examples_dir = Path(__file__).parent.parent.parent / "examples" / "microservices"
 sys.path.insert(0, str(examples_dir))
 
 from api_gateway import ApiGateway  # noqa: E402  # type: ignore[import-not-found]

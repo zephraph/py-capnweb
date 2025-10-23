@@ -10,17 +10,12 @@ from unittest.mock import Mock
 
 import pytest
 
-# Check if WebTransport is available
-try:
-    from capnweb.webtransport import (
-        WEBTRANSPORT_AVAILABLE,
-        WebTransportClient,
-        WebTransportClientProtocol,
-        WebTransportServer,
-        WebTransportServerProtocol,
-    )
-except ImportError:
-    WEBTRANSPORT_AVAILABLE = False
+from capnweb.webtransport import (
+    WebTransportClient,
+    WebTransportClientProtocol,
+    WebTransportServer,
+    WebTransportServerProtocol,
+)
 
 from capnweb.certs import (
     generate_self_signed_cert,
@@ -35,30 +30,6 @@ from capnweb.transports import (
 # We mark specific test classes that need aioquic
 
 
-class TestWebTransportAvailability:
-    """Test WebTransport availability check."""
-
-    def test_webtransport_available_flag(self):
-        """Test WEBTRANSPORT_AVAILABLE flag is set correctly."""
-        # This tests the import handling
-        assert isinstance(WEBTRANSPORT_AVAILABLE, bool)
-
-    @pytest.mark.skipif(WEBTRANSPORT_AVAILABLE, reason="Testing unavailable scenario")
-    def test_client_creation_without_aioquic(self):
-        """Test WebTransportClient raises error without aioquic."""
-        # This would only run if aioquic is NOT installed
-        # We can't really test this in CI if aioquic is installed
-
-    @pytest.mark.skipif(WEBTRANSPORT_AVAILABLE, reason="Testing unavailable scenario")
-    def test_server_creation_without_aioquic(self):
-        """Test WebTransportServer raises error without aioquic."""
-        # This would only run if aioquic is NOT installed
-
-
-@pytest.mark.skipif(
-    not WEBTRANSPORT_AVAILABLE,
-    reason="WebTransport requires aioquic library",
-)
 class TestWebTransportImports:
     """Test WebTransport class imports and initialization."""
 
@@ -165,10 +136,6 @@ class TestWebTransportImports:
         assert server is not None
 
 
-@pytest.mark.skipif(
-    not WEBTRANSPORT_AVAILABLE,
-    reason="WebTransport requires aioquic library",
-)
 class TestWebTransportTransport:
     """Test WebTransportTransport integration."""
 
@@ -197,10 +164,6 @@ class TestWebTransportTransport:
         assert isinstance(transport, HttpBatchTransport)
 
 
-@pytest.mark.skipif(
-    not WEBTRANSPORT_AVAILABLE,
-    reason="WebTransport requires aioquic library",
-)
 class TestWebTransportClientServer:
     """Test WebTransport client-server communication."""
 
