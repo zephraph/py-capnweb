@@ -206,16 +206,22 @@ class RpcPromise:
             msg = "Keyword arguments not yet supported in RPC calls"
             raise NotImplementedError(msg)
 
-        args_payload = RpcPayload.from_app_params(list(args))
-
-        async def do_call():
-            result_hook = await self._hook.call([], args_payload)
-            return result_hook
-
-        future = asyncio.ensure_future(do_call())
-
         from capnweb.core.hooks import PromiseStubHook  # noqa: PLC0415
 
+        args_payload = RpcPayload.from_app_params(list(args))
+
+        # Call the hook's call method
+        result_hook_coro = self._hook.call([], args_payload)
+
+        # Create a wrapper that unwraps PromiseStubHook to avoid double-wrapping
+        async def unwrap_if_promise():
+            hook = await result_hook_coro
+            # If the hook is already a PromiseStubHook, await its future to get the actual result
+            if isinstance(hook, PromiseStubHook):
+                return await hook.future
+            return hook
+
+        future = asyncio.ensure_future(unwrap_if_promise())
         return RpcPromise(PromiseStubHook(future), session=self._session)
 
     def map(self, func: Callable[[RpcPromise], Any]) -> RpcPromise:

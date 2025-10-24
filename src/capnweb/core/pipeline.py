@@ -201,16 +201,20 @@ class PipelineBatch:
             )
             await self._client._transport.__aenter__()  # noqa: PLC2801
 
-    def _build_batch_messages(self) -> list[WireMessage]:
+    def _build_batch_messages(self) -> tuple[list[WireMessage], dict[int, ImportId]]:
         """Build the batch of push and pull messages.
 
         Returns:
-            List of wire messages to send
+            A tuple containing:
+            - List of wire messages to send.
+            - A map from server-side export IDs to client-side import IDs.
         """
         messages: list[WireMessage] = []
+        server_to_client_id_map: dict[int, ImportId] = {}
+        server_export_id = 1
 
-        # Add push messages for all pending calls
-        for call_or_expr in self._pending_calls.values():
+        # Add push messages and build ID map
+        for client_import_id, call_or_expr in self._pending_calls.items():
             if isinstance(call_or_expr, PendingCall):
                 pending_call = call_or_expr
                 # Build property path including method name
@@ -229,32 +233,47 @@ class PipelineBatch:
                 # Direct pipeline expression
                 messages.append(WirePush(call_or_expr))
 
-        # Add pull messages for all import IDs we need results for
-        messages.extend(WirePull(import_id.value) for import_id in self._pending_calls)
+            # Map server's implicit export ID to client-side import ID
+            server_to_client_id_map[server_export_id] = client_import_id
+            server_export_id += 1
 
-        return messages
+        # Add pull messages for all export IDs (using server-side sequential IDs)
+        messages.extend(WirePull(server_id) for server_id in server_to_client_id_map)
 
-    def _process_response_messages(self, response_messages: list[WireMessage]) -> None:
-        """Process response messages and store results.
+        return messages, server_to_client_id_map
+
+    def _process_response_messages(
+        self,
+        response_messages: list[WireMessage],
+        server_to_client_id_map: dict[int, ImportId],
+    ) -> None:
+        """Process response messages and store results using the ID map.
 
         Args:
             response_messages: List of response messages from the server
+            server_to_client_id_map: Map from server-side export IDs to client-side import IDs
         """
         for msg in response_messages:
             if isinstance(msg, WireResolve):
-                # Export ID matches import ID (positive)
-                result_import_id = ImportId(msg.export_id)
-                if result_import_id in self._pending_calls:
-                    self._results[result_import_id] = msg.value
+                # Server responds with negative export_id, so take absolute value
+                server_export_id = abs(msg.export_id)
+                client_import_id = server_to_client_id_map.get(server_export_id)
+
+                if client_import_id is not None:
+                    # Parse the value using the client's parser
+                    parsed_payload = self._client.parser.parse(msg.value)
+                    self._results[client_import_id] = parsed_payload.value
 
             elif isinstance(msg, WireReject):
-                # Export ID matches import ID (positive)
-                result_import_id = ImportId(msg.export_id)
-                if result_import_id in self._pending_calls:
+                # Server responds with negative export_id, so take absolute value
+                server_export_id = abs(msg.export_id)
+                client_import_id = server_to_client_id_map.get(server_export_id)
+
+                if client_import_id is not None:
                     # Parse error and store it as an exception
                     error = self._client._parse_error(msg.error)
                     # Store the error - will be raised when awaited
-                    self._results[result_import_id] = error
+                    self._results[client_import_id] = error
 
     async def _execute(self) -> None:
         """Execute all pending calls in a single batch.
@@ -271,8 +290,8 @@ class PipelineBatch:
             # Ensure transport is available
             await self._ensure_transport()
 
-            # Build batch of push and pull messages
-            messages = self._build_batch_messages()
+            # Build batch of push and pull messages, getting ID mapping
+            messages, server_to_client_id_map = self._build_batch_messages()
 
             # Send the entire batch in one request
             batch = serialize_wire_batch(messages)
@@ -291,9 +310,11 @@ class PipelineBatch:
                 if not response_text:
                     return
 
-                # Parse and process responses
+                # Parse and process responses with ID mapping
                 response_messages = parse_wire_batch(response_text)
-                self._process_response_messages(response_messages)
+                self._process_response_messages(
+                    response_messages, server_to_client_id_map
+                )
 
             except Exception as e:
                 # Store the error for all pending calls

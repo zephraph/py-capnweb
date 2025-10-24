@@ -12,6 +12,7 @@ features of the Cap'n Web protocol:
 """
 
 import asyncio
+import logging
 import sys
 from typing import Any
 
@@ -197,6 +198,12 @@ class TestService(RpcTarget):
 
 async def main() -> None:
     """Start the Python interop server."""
+    # Enable DEBUG logging to see wire messages
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
 
     config = ServerConfig(

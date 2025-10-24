@@ -383,6 +383,24 @@ class Client(RpcSession):
         # Return stub wrapping the hook
         return RpcStub(hook)
 
+    def get_remote_stub(self, remote_export_id: int) -> RpcStub:
+        """Get a stub for a remote capability exported by the server.
+
+        This creates an import for the server's capability and returns a stub
+        that can be used to call methods on it.
+
+        Args:
+            remote_export_id: The export ID of the capability on the server
+
+        Returns:
+            RpcStub that references the remote capability
+        """
+        # Use the import_capability method from RpcSession to create the import
+        hook = self.import_capability(remote_export_id)
+
+        # Return stub with session for map() support
+        return RpcStub(hook, session=self)
+
     def validate_resume_token(self, token: ResumeToken) -> bool:
         """Validate a resume token.
 
@@ -514,8 +532,10 @@ class Client(RpcSession):
         )
 
         # Create push and pull messages
+        # Server auto-assigns sequential IDs starting from 1, so request ID 1
         push_msg = WirePush(pipeline_expr)
-        pull_msg = WirePull(result_import_id)
+        server_import_id = 1  # Server will assign this ID to the WirePush
+        pull_msg = WirePull(server_import_id)
 
         # Send immediately in a background task
         async def send_and_handle():
@@ -529,9 +549,10 @@ class Client(RpcSession):
             response_text = response_bytes.decode("utf-8")
 
             # Parse response and resolve the pending import
+            # Server responds with positive export_id per Cap'n Web protocol
             messages = parse_wire_batch(response_text)
             for msg in messages:
-                if isinstance(msg, WireResolve) and msg.export_id == -result_import_id:
+                if isinstance(msg, WireResolve) and msg.export_id == server_import_id:
                     result_payload = self.parser.parse(msg.value)
                     # Get the future for this import
                     if result_import_id in self._pending_promises:
@@ -540,7 +561,7 @@ class Client(RpcSession):
                             # Create hook from the payload
                             result_hook = PayloadStubHook(result_payload)
                             future.set_result(result_hook)
-                elif isinstance(msg, WireReject) and msg.export_id == -result_import_id:
+                elif isinstance(msg, WireReject) and msg.export_id == server_import_id:
                     error = self._parse_error(msg.error)
                     if result_import_id in self._pending_promises:
                         future = self._pending_promises.pop(result_import_id)
@@ -626,8 +647,10 @@ class Client(RpcSession):
         )
 
         # Create push and pull messages
+        # Server auto-assigns sequential IDs starting from 1, so request ID 1
         push_msg = WirePush(remap_expr)
-        pull_msg = WirePull(result_import_id)
+        server_import_id = 1  # Server will assign this ID to the WirePush
+        pull_msg = WirePull(server_import_id)
 
         # Send in a background task
         async def send_and_handle():
@@ -642,11 +665,12 @@ class Client(RpcSession):
                 response_text = response_bytes.decode("utf-8")
 
                 # Parse response and resolve the pending import
+                # Server responds with positive export_id per Cap'n Web protocol
                 messages = parse_wire_batch(response_text)
                 for msg in messages:
                     if (
                         isinstance(msg, WireResolve)
-                        and msg.export_id == -result_import_id
+                        and msg.export_id == server_import_id
                     ):
                         result_payload = self.parser.parse(msg.value)
                         # Get the future for this import
@@ -658,7 +682,7 @@ class Client(RpcSession):
                                 future.set_result(result_hook)
                     elif (
                         isinstance(msg, WireReject)
-                        and msg.export_id == -result_import_id
+                        and msg.export_id == server_import_id
                     ):
                         error = self._parse_error(msg.error)
                         if result_import_id in self._pending_promises:
@@ -723,10 +747,10 @@ class Client(RpcSession):
         messages = parse_wire_batch(response_text)
 
         for msg in messages:
-            if isinstance(msg, WireResolve) and msg.export_id == -import_id:
+            if isinstance(msg, WireResolve) and msg.export_id == import_id:
                 # Parse and return the value
                 return self.parser.parse(msg.value)
-            if isinstance(msg, WireReject) and msg.export_id == -import_id:
+            if isinstance(msg, WireReject) and msg.export_id == import_id:
                 error = self._parse_error(msg.error)
                 raise error
 

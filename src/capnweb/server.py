@@ -422,6 +422,17 @@ class Server(RpcSession):
             # Parse messages
             messages = parse_wire_batch(body)
 
+            # DEBUG: Log for interop debugging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"[BATCH] Received {len(messages)} messages")
+            for i, msg in enumerate(messages):
+                if isinstance(msg, WirePush):
+                    logger.debug(f"  [{i}] WirePush: {msg.expression}")
+                elif isinstance(msg, WirePull):
+                    logger.debug(f"  [{i}] WirePull: import_id={msg.import_id}")
+                else:
+                    logger.debug(f"  [{i}] {type(msg).__name__}: {msg}")
+
             if len(messages) > self.config.max_batch_size:
                 error = WireAbort(f"Batch size {len(messages)} exceeds maximum")
                 return web.Response(
@@ -455,10 +466,24 @@ class Server(RpcSession):
                 if response:
                     responses.append(response)
 
+            # DEBUG: Log responses
+            logger.debug(f"[BATCH] Sending {len(responses)} responses")
+            for i, resp in enumerate(responses):
+                if isinstance(resp, WireResolve):
+                    logger.debug(f"  [{i}] WireResolve: export_id={resp.export_id}")
+                elif isinstance(resp, WireReject):
+                    logger.debug(
+                        f"  [{i}] WireReject: export_id={resp.export_id}, error={resp.error}"
+                    )
+                else:
+                    logger.debug(f"  [{i}] {type(resp).__name__}: {resp}")
+
             # Send responses
             if responses:
+                response_body = serialize_wire_batch(responses)
+                logger.debug(f"[BATCH] Response body:\n{response_body}")
                 return web.Response(
-                    text=serialize_wire_batch(responses),
+                    text=response_body,
                     content_type="application/x-ndjson",
                 )
             return web.Response(status=204)
@@ -1039,14 +1064,14 @@ class Server(RpcSession):
             # This will handle exporting any RpcStub/RpcPromise within the result
             serialized_value = self.serializer.serialize_payload(payload)
 
-            # Export ID matches the import ID in the response
+            # Export ID matches import ID (positive) per Cap'n Web protocol spec
             export_id = import_id
 
             # Send resolution
             return WireResolve(export_id, serialized_value)
 
         except RpcError as e:
-            # Send rejection
+            # Send rejection with matching export_id (positive)
             export_id = import_id
             stack = (
                 str(e.data)
