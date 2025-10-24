@@ -304,6 +304,29 @@ class RpcSession:
         msg = "Subclasses must implement send_pipeline_get"
         raise NotImplementedError(msg)
 
+    def send_pipeline_map(
+        self,
+        import_id: int,
+        path: list[str | int],
+        captures: list,
+        instructions: list[Any],
+        result_import_id: int,
+    ) -> None:
+        """Send a pipelined map message.
+
+        This is called by RpcImportHook/ChainedImportHook when .map() is called
+        on a remote capability.
+
+        Args:
+            import_id: The import ID to map over
+            path: Property path to the iterable
+            captures: External capabilities used in the map function
+            instructions: Operations to perform for each element
+            result_import_id: Import ID for the result
+        """
+        msg = "Subclasses must implement send_pipeline_map"
+        raise NotImplementedError(msg)
+
     async def pull_import(self, import_id: int) -> Any:
         """Pull the value from a remote capability.
 

@@ -25,6 +25,7 @@ from capnweb.core.payload import RpcPayload
 from capnweb.error import RpcError
 
 if TYPE_CHECKING:
+    from capnweb.core.mapper import MapBuilder
     from capnweb.core.session import RpcSession
     from capnweb.types import RpcTarget
 
@@ -64,19 +65,21 @@ class StubHook(ABC):
         """
         ...
 
-    # @abstractmethod
-    # def map(self, path: list[str | int], captures: list[StubHook], instructions: list[Any]) -> StubHook:
-    #     """Apply a map operation through this hook.
-    #
-    #     Args:
-    #         path: Property path to the iterable to map over
-    #         captures: External capabilities used in the map function
-    #         instructions: A list of operations to perform for each element
-    #
-    #     Returns:
-    #         A new StubHook representing the promise for the mapped result
-    #     """
-    #     ...
+    @abstractmethod
+    def map(
+        self, path: list[str | int], captures: list[StubHook], instructions: list[Any]
+    ) -> StubHook:
+        """Apply a map operation through this hook.
+
+        Args:
+            path: Property path to the iterable to map over
+            captures: External capabilities used in the map function
+            instructions: A list of operations to perform for each element
+
+        Returns:
+            A new StubHook representing the promise for the mapped result
+        """
+        ...
 
     @abstractmethod
     async def pull(self) -> RpcPayload:
@@ -237,6 +240,50 @@ class PayloadStubHook(StubHook):
         except (KeyError, IndexError, AttributeError) as e:
             error = RpcError.not_found(f"Property {path} not found: {e}")
             return ErrorStubHook(error)
+
+    def map(
+        self, path: list[str | int], captures: list[StubHook], instructions: list[Any]
+    ) -> StubHook:
+        """Execute a map operation locally.
+
+        Args:
+            path: Property path to the iterable
+            captures: External capabilities used in the map function
+            instructions: Operations to perform for each element
+
+        Returns:
+            A new hook with the mapped result
+        """
+        from capnweb.core.mapper import MapApplicator  # noqa: PLC0415
+
+        try:
+            target_iterable = self._navigate(path)
+            if not isinstance(target_iterable, list):
+                # For now, only support mapping over lists.
+                msg = ".map() can only be called on lists"
+                raise RpcError.bad_request(msg)
+
+            # Convert captures to JSON format for MapApplicator
+            # We need a session to do this - but PayloadStubHook doesn't have one
+            # So we'll need to handle this differently
+            # For now, assume captures are already in the right format
+            from capnweb.core.session import RpcSession  # noqa: PLC0415
+
+            # Create a minimal session for local execution
+            session = RpcSession()
+            applicator = MapApplicator(session, [], instructions)
+
+            async def apply_all():
+                results = await asyncio.gather(*[
+                    applicator.execute(item) for item in target_iterable
+                ])
+                return PayloadStubHook(RpcPayload.owned(results))
+
+            future: asyncio.Future[StubHook] = asyncio.ensure_future(apply_all())
+            return PromiseStubHook(future)
+        except Exception as e:
+            msg = f"Local map execution failed: {e}"
+            return ErrorStubHook(RpcError.internal(msg))
 
     def _navigate(self, path: list[str | int]) -> Any:
         """Navigate through the payload's value using the path.
@@ -429,6 +476,27 @@ class TargetStubHook(StubHook):
         )
         return ErrorStubHook(error)
 
+    def map(
+        self, path: list[str | int], captures: list[StubHook], instructions: list[Any]
+    ) -> StubHook:
+        """A TargetStubHook represents a single capability, not a collection.
+
+        It's not iterable, so .map() is not a valid operation on it directly.
+
+        Args:
+            path: Property path to the iterable
+            captures: External capabilities used in the map function
+            instructions: Operations to perform for each element
+
+        Returns:
+            An ErrorStubHook since this operation is not valid
+        """
+        # Dispose captures since we're taking ownership
+        for cap in captures:
+            cap.dispose()
+        msg = ".map() cannot be called on a root capability"
+        return ErrorStubHook(RpcError.bad_request(msg))
+
     async def pull(self) -> RpcPayload:
         """Targets can't be pulled directly."""
 
@@ -503,6 +571,34 @@ class ChainedImportHook(StubHook):
         """
         # Chain another level
         return ChainedImportHook(self.session, self.import_id, self.path + path)
+
+    def map(
+        self, path: list[str | int], captures: list[StubHook], instructions: list[Any]
+    ) -> StubHook:
+        """Send a map operation to the remote side.
+
+        Args:
+            path: Property path to the iterable
+            captures: External capabilities used in the map function
+            instructions: Operations to perform for each element
+
+        Returns:
+            A PromiseStubHook for the result
+        """
+        # Combine the stored path with the additional path
+        full_path = self.path + path
+
+        # Allocate import ID for the result
+        result_import_id = self.session.allocate_import_id()
+        future: asyncio.Future[StubHook] = asyncio.Future()
+        self.session.register_pending_import(result_import_id, future)
+
+        # Send the pipeline map message
+        self.session.send_pipeline_map(
+            self.import_id, full_path, captures, instructions, result_import_id
+        )
+
+        return PromiseStubHook(future)
 
     async def pull(self) -> RpcPayload:
         """Pull the value (triggers actual GET operation).
@@ -582,6 +678,31 @@ class RpcImportHook(StubHook):
         # instead of GET+CALL
         return ChainedImportHook(self.session, self.import_id, path)
 
+    def map(
+        self, path: list[str | int], captures: list[StubHook], instructions: list[Any]
+    ) -> StubHook:
+        """Send a map operation to the remote side.
+
+        Args:
+            path: Property path to the iterable
+            captures: External capabilities used in the map function
+            instructions: Operations to perform for each element
+
+        Returns:
+            A PromiseStubHook for the result
+        """
+        # Allocate import ID for the result
+        result_import_id = self.session.allocate_import_id()
+        future: asyncio.Future[StubHook] = asyncio.Future()
+        self.session.register_pending_import(result_import_id, future)
+
+        # Send the pipeline map message
+        self.session.send_pipeline_map(
+            self.import_id, path, captures, instructions, result_import_id
+        )
+
+        return PromiseStubHook(future)
+
     async def pull(self) -> RpcPayload:
         """Pull the value from the remote capability.
 
@@ -648,6 +769,27 @@ class PromiseStubHook(StubHook):
         chained_future: asyncio.Future[StubHook] = asyncio.ensure_future(chained_get())
         return PromiseStubHook(chained_future)
 
+    def map(
+        self, path: list[str | int], captures: list[StubHook], instructions: list[Any]
+    ) -> StubHook:
+        """Wait for the promise to resolve, then map on the result.
+
+        Args:
+            path: Property path to the iterable
+            captures: External capabilities used in the map function
+            instructions: Operations to perform for each element
+
+        Returns:
+            A new PromiseStubHook for the chained result
+        """
+
+        async def chained_map():
+            resolved_hook = await self.future
+            return resolved_hook.map(path, captures, instructions)
+
+        chained_future: asyncio.Future[StubHook] = asyncio.ensure_future(chained_map())
+        return PromiseStubHook(chained_future)
+
     async def pull(self) -> RpcPayload:
         """Wait for the promise to resolve, then pull from the result.
 
@@ -671,3 +813,73 @@ class PromiseStubHook(StubHook):
     def dup(self) -> Self:
         """Share the same future (promises can be shared)."""
         return PromiseStubHook(self.future)  # type: ignore[return-value]
+
+
+@dataclass
+class MapVariableHook(StubHook):
+    """A hook representing a placeholder variable inside a .map() function.
+
+    Operations on this hook do not execute immediately but are recorded as
+    instructions by a MapBuilder.
+    """
+
+    builder: MapBuilder
+    idx: int  # 0 for input, >0 for instruction result
+
+    async def call(self, path: list[str | int], args: RpcPayload) -> StubHook:
+        """Record a call instruction in the builder.
+
+        Args:
+            path: Property path + method name
+            args: Arguments for the call
+
+        Returns:
+            A new MapVariableHook for the result
+        """
+        return self.builder.add_instruction(self, path, args)
+
+    def map(
+        self, path: list[str | int], captures: list[StubHook], instructions: list[Any]
+    ) -> StubHook:
+        """Nested .map() calls are not supported.
+
+        Args:
+            path: Property path to the iterable
+            captures: External capabilities
+            instructions: Operations to perform
+
+        Returns:
+            An ErrorStubHook since nested maps are not allowed
+        """
+        # Dispose captures
+        for cap in captures:
+            cap.dispose()
+        msg = "Nested .map() calls are not supported"
+        return ErrorStubHook(RpcError.bad_request(msg))
+
+    def get(self, path: list[str | int]) -> StubHook:
+        """Record a property access instruction in the builder.
+
+        Args:
+            path: Property path
+
+        Returns:
+            A new MapVariableHook for the result
+        """
+        return self.builder.add_instruction(self, path, None)
+
+    async def pull(self) -> RpcPayload:
+        """Cannot await a map variable inside the map function.
+
+        Raises:
+            RpcError: Always, since this operation is not allowed
+        """
+        msg = "Cannot await a map variable inside the map function"
+        raise RpcError.bad_request(msg)
+
+    def dispose(self) -> None:
+        """No resources to release for map variables."""
+
+    def dup(self) -> Self:
+        """Variables are immutable references."""
+        return self

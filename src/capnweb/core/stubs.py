@@ -8,12 +8,14 @@ provide a natural, Proxy-like API.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Self
 
 from capnweb.core.payload import RpcPayload
 
 if TYPE_CHECKING:
     from capnweb.core.hooks import StubHook
+    from capnweb.core.session import RpcSession
 
 
 class RpcStub:
@@ -36,14 +38,16 @@ class RpcStub:
         ```
     """
 
-    def __init__(self, hook: StubHook) -> None:
+    def __init__(self, hook: StubHook, session: RpcSession | None = None) -> None:
         """Initialize with a hook.
 
         Args:
             hook: The StubHook backing this stub
+            session: The RpcSession, required for map() operations
         """
         # Use object.__setattr__ to avoid triggering __setattr__
         object.__setattr__(self, "_hook", hook)
+        object.__setattr__(self, "_session", session)
 
     def __getattr__(self, name: str) -> RpcPromise:
         """Access a property, returning a promise for the value.
@@ -61,7 +65,7 @@ class RpcStub:
 
         # Get the property through the hook
         result_hook = self._hook.get([name])
-        return RpcPromise(result_hook)  # type: ignore[arg-type]
+        return RpcPromise(result_hook, session=self._session)  # type: ignore[arg-type]
 
     def __call__(self, *args: Any, **kwargs: Any) -> RpcPromise:
         """Call the stub as a function.
@@ -89,7 +93,34 @@ class RpcStub:
 
         from capnweb.core.hooks import PromiseStubHook  # noqa: PLC0415
 
-        return RpcPromise(PromiseStubHook(future))
+        return RpcPromise(PromiseStubHook(future), session=self._session)
+
+    def map(self, func: Callable[[RpcPromise], Any]) -> RpcPromise:
+        """Apply a function to each element of a capability's value on the server.
+
+        This is used for promise pipelining of collection transformations.
+
+        Args:
+            func: A non-async function that takes a promise and returns a
+                  transformed value or promise.
+
+        Returns:
+            A promise for the transformed collection.
+
+        Example:
+            ```python
+            # Map over a list of users, extracting their IDs
+            user_ids = client.get_users().map(lambda user: user.id)
+            result = await user_ids  # [1, 2, 3, ...]
+            ```
+        """
+        if self._session is None:
+            msg = "An RpcSession is required to use the .map() operation"
+            raise RuntimeError(msg)
+
+        from capnweb.core.mapper import send_map  # noqa: PLC0415
+
+        return send_map(self._session, self._hook, [], func)
 
     def dispose(self) -> None:
         """Dispose this stub, releasing resources.
@@ -131,13 +162,15 @@ class RpcPromise:
         ```
     """
 
-    def __init__(self, hook: StubHook) -> None:
+    def __init__(self, hook: StubHook, session: RpcSession | None = None) -> None:
         """Initialize with a hook.
 
         Args:
             hook: The StubHook backing this promise
+            session: The RpcSession, required for map() operations
         """
         object.__setattr__(self, "_hook", hook)
+        object.__setattr__(self, "_session", session)
 
     def __getattr__(self, name: str) -> RpcPromise:
         """Access a property on the promised value, returning a new promise.
@@ -155,7 +188,7 @@ class RpcPromise:
             raise AttributeError(msg)
 
         result_hook = self._hook.get([name])
-        return RpcPromise(result_hook)  # type: ignore[arg-type]
+        return RpcPromise(result_hook, session=self._session)  # type: ignore[arg-type]
 
     def __call__(self, *args: Any, **kwargs: Any) -> RpcPromise:
         """Call the promised value as a function, returning a new promise.
@@ -183,7 +216,34 @@ class RpcPromise:
 
         from capnweb.core.hooks import PromiseStubHook  # noqa: PLC0415
 
-        return RpcPromise(PromiseStubHook(future))
+        return RpcPromise(PromiseStubHook(future), session=self._session)
+
+    def map(self, func: Callable[[RpcPromise], Any]) -> RpcPromise:
+        """Apply a function to each element of the promised collection.
+
+        This is used for promise pipelining of collection transformations.
+
+        Args:
+            func: A non-async function that takes a promise and returns a
+                  transformed value or promise.
+
+        Returns:
+            A promise for the transformed collection.
+
+        Example:
+            ```python
+            # Map over a promised list of users
+            user_ids = stub.get_users().map(lambda user: user.id)
+            result = await user_ids  # [1, 2, 3, ...]
+            ```
+        """
+        if self._session is None:
+            msg = "An RpcSession is required to use the .map() operation"
+            raise RuntimeError(msg)
+
+        from capnweb.core.mapper import send_map  # noqa: PLC0415
+
+        return send_map(self._session, self._hook, [], func)
 
     def __await__(self):
         """Make this promise awaitable.

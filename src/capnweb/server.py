@@ -30,6 +30,7 @@ from capnweb.protocol.wire import (
     WirePush,
     WireReject,
     WireRelease,
+    WireRemap,
     WireResolve,
     parse_wire_batch,
     serialize_wire_batch,
@@ -631,61 +632,132 @@ class Server(RpcSession):
         """Handle a push message from client over WebSocket.
 
         Args:
-            expression: The wire expression (expected to be WirePipeline)
+            expression: The wire expression (WirePipeline or WireRemap)
             import_id: The import ID assigned for this push
             session: The WebSocket session
         """
         try:
-            # Validate the pipeline expression
-            if not isinstance(expression, WirePipeline):
-                msg = "Expected WirePipeline expression in push"
-                raise RpcError.bad_request(msg)
+            # Handle WireRemap expressions
+            if isinstance(expression, WireRemap):
+                from capnweb.core.hooks import PayloadStubHook
+                from capnweb.core.mapper import MapApplicator
 
-            # Get the target hook (either from session imports or server exports)
-            target_hook = session.get_import_hook(expression.import_id)
-            if target_hook is None:
-                target_hook = session.get_export_hook(expression.import_id)
+                # Get the target hook
+                target_hook = session.get_import_hook(expression.import_id)
+                if target_hook is None:
+                    target_hook = session.get_export_hook(expression.import_id)
 
-            if target_hook is None:
-                msg = f"Capability {expression.import_id} not found"
-                raise RpcError.not_found(msg)
+                if target_hook is None:
+                    msg = f"Capability {expression.import_id} not found"
+                    raise RpcError.not_found(msg)
 
-            # Parse arguments using the session's parser
-            args_payload = (
-                session.parser.parse(expression.args)
-                if expression.args is not None
-                else RpcPayload.owned([])
-            )
+                # Navigate property path if provided
+                collection_hook = target_hook
+                if expression.property_path:
+                    path = [str(pk.value) for pk in expression.property_path]
+                    collection_hook = collection_hook.get(path)
 
-            # Extract the path
-            path: list[str | int] = [
-                str(pk.value) for pk in (expression.property_path or [])
-            ]
+                # Execute map asynchronously
+                async def execute_remap() -> StubHook:
+                    """Execute the remap operation and return the result hook."""
+                    try:
+                        # Pull the collection
+                        payload = await collection_hook.pull()
+                        collection = payload.value
 
-            # Execute the call asynchronously
-            async def execute_call() -> StubHook:
-                """Execute the method call and return the result hook."""
-                try:
-                    assert target_hook is not None
-                    result_hook = await target_hook.call(path, args_payload)
-                    return result_hook
-                except RpcError as e:
-                    return ErrorStubHook(e)
-                except Exception as e:
-                    logger = logging.getLogger(__name__)
-                    logger.exception("Call execution failed: %s", e)
-                    return ErrorStubHook(RpcError.internal(f"Target call failed: {e}"))
+                        # Convert captures to JSON format
+                        captures_json = [cap.to_json() for cap in expression.captures]
 
-            # Create a future for the result
-            result_future: asyncio.Future[StubHook] = asyncio.create_task(
-                execute_call()
-            )
+                        # Convert instructions to JSON format
+                        instructions_json = [
+                            instr.to_json() if hasattr(instr, "to_json") else instr
+                            for instr in expression.instructions
+                        ]
 
-            # Store the future in the session imports as a PromiseStubHook
-            session._imports[import_id] = PromiseStubHook(result_future)
+                        # Create MapApplicator
+                        applicator = MapApplicator(
+                            session, captures_json, instructions_json
+                        )
 
-            # No immediate response - client will pull when ready
-            return None
+                        # Apply transformation to each item
+                        results = []
+                        for item in collection:
+                            result = await applicator.execute(item)
+                            results.append(result)
+
+                        # Return result as PayloadStubHook
+                        return PayloadStubHook(RpcPayload.owned(results))
+
+                    except RpcError as e:
+                        return ErrorStubHook(e)
+                    except Exception as e:
+                        logger = logging.getLogger(__name__)
+                        logger.exception("Remap execution failed: %s", e)
+                        return ErrorStubHook(RpcError.internal(f"Remap failed: {e}"))
+
+                # Create a future for the result
+                result_future: asyncio.Future[StubHook] = asyncio.create_task(
+                    execute_remap()
+                )
+
+                # Store the future in the session imports
+                session._imports[import_id] = PromiseStubHook(result_future)
+
+                # No immediate response - client will pull when ready
+                return None
+
+            # Handle WirePipeline expressions
+            if isinstance(expression, WirePipeline):
+                # Get the target hook (either from session imports or server exports)
+                target_hook = session.get_import_hook(expression.import_id)
+                if target_hook is None:
+                    target_hook = session.get_export_hook(expression.import_id)
+
+                if target_hook is None:
+                    msg = f"Capability {expression.import_id} not found"
+                    raise RpcError.not_found(msg)
+
+                # Parse arguments using the session's parser
+                args_payload = (
+                    session.parser.parse(expression.args)
+                    if expression.args is not None
+                    else RpcPayload.owned([])
+                )
+
+                # Extract the path
+                path: list[str | int] = [
+                    str(pk.value) for pk in (expression.property_path or [])
+                ]
+
+                # Execute the call asynchronously
+                async def execute_call() -> StubHook:
+                    """Execute the method call and return the result hook."""
+                    try:
+                        assert target_hook is not None
+                        result_hook = await target_hook.call(path, args_payload)
+                        return result_hook
+                    except RpcError as e:
+                        return ErrorStubHook(e)
+                    except Exception as e:
+                        logger = logging.getLogger(__name__)
+                        logger.exception("Call execution failed: %s", e)
+                        return ErrorStubHook(
+                            RpcError.internal(f"Target call failed: {e}")
+                        )
+
+                # Create a future for the result
+                result_future: asyncio.Future[StubHook] = asyncio.create_task(
+                    execute_call()
+                )
+
+                # Store the future in the session imports as a PromiseStubHook
+                session._imports[import_id] = PromiseStubHook(result_future)
+
+                # No immediate response - client will pull when ready
+                return None
+
+            msg = "Expected WirePipeline or WireRemap expression in push"
+            raise RpcError.bad_request(msg)
 
         except RpcError as e:
             stack = (
@@ -773,77 +845,148 @@ class Server(RpcSession):
     async def _handle_push(
         self, expression: Any, import_id: int, imports: dict[int, StubHook]
     ) -> WireMessage | None:
-        """Handle a push message - evaluate pipeline expression and store result.
+        """Handle a push message - evaluate pipeline or remap expression and store result.
 
         Args:
-            expression: The wire expression (expected to be WirePipeline)
+            expression: The wire expression (WirePipeline or WireRemap)
             import_id: The import ID assigned sequentially for this push in the current batch
             imports: The batch-local import table
 
         The client's push messages are implicitly numbered sequentially (1, 2, 3...).
         The server tracks these in the import table so they can be pulled later.
 
-        Note: WirePipeline expressions are handled directly here, not through the Parser,
-        because they are a server-side execution construct, not a serialized data type.
+        Note: WirePipeline and WireRemap expressions are handled directly here,
+        not through the Parser, because they are server-side execution constructs.
         """
         try:
-            # Validate the pipeline expression
-            if not isinstance(expression, WirePipeline):
-                msg = "Expected WirePipeline expression in push"
-                raise RpcError.bad_request(msg)
+            # Handle WireRemap expressions
+            if isinstance(expression, WireRemap):
+                from capnweb.core.hooks import PayloadStubHook
+                from capnweb.core.mapper import MapApplicator
 
-            # Get the target hook (either from batch imports or our exports)
-            target_hook = imports.get(expression.import_id)
-            if target_hook is None:
-                target_hook = self.get_export_hook(expression.import_id)
+                # Get the target hook
+                target_hook = imports.get(expression.import_id)
+                if target_hook is None:
+                    target_hook = self.get_export_hook(expression.import_id)
 
-            if target_hook is None:
-                msg = f"Capability {expression.import_id} not found"
-                raise RpcError.not_found(msg)
+                if target_hook is None:
+                    msg = f"Capability {expression.import_id} not found"
+                    raise RpcError.not_found(msg)
 
-            # Parse arguments using the session's parser
-            # This handles any ["export", id] references within the args
-            args_payload = (
-                self.parser.parse(expression.args)
-                if expression.args is not None
-                else RpcPayload.owned([])
-            )
+                # Navigate property path if provided
+                collection_hook = target_hook
+                if expression.property_path:
+                    path = [str(pk.value) for pk in expression.property_path]
+                    collection_hook = collection_hook.get(path)
 
-            # Extract the path (method and property names)
-            path: list[str | int] = [
-                str(pk.value) for pk in (expression.property_path or [])
-            ]
+                # Execute map asynchronously
+                async def execute_remap() -> StubHook:
+                    """Execute the remap operation and return the result hook."""
+                    try:
+                        # Pull the collection
+                        payload = await collection_hook.pull()
+                        collection = payload.value
 
-            # Execute the call asynchronously
-            async def execute_call() -> StubHook:
-                """Execute the method call and return the result hook."""
-                try:
-                    # target_hook is guaranteed non-None at this point due to check above
-                    assert target_hook is not None
-                    # Call through the hook chain
-                    result_hook = await target_hook.call(path, args_payload)
-                    return result_hook
+                        # Convert captures to JSON format
+                        captures_json = [cap.to_json() for cap in expression.captures]
 
-                except RpcError as e:
-                    # RPC errors become ErrorStubHook
-                    return ErrorStubHook(e)
-                except Exception as e:
-                    # Other errors become internal RPC errors
-                    logger = logging.getLogger(__name__)
-                    logger.exception("Call execution failed: %s", e)
-                    return ErrorStubHook(RpcError.internal(f"Target call failed: {e}"))
+                        # Convert instructions to JSON format
+                        instructions_json = [
+                            instr.to_json() if hasattr(instr, "to_json") else instr
+                            for instr in expression.instructions
+                        ]
 
-            # Create a future for the result
-            result_future: asyncio.Future[StubHook] = asyncio.create_task(
-                execute_call()
-            )
+                        # Create MapApplicator
+                        applicator = MapApplicator(
+                            self, captures_json, instructions_json
+                        )
 
-            # Store the future in the batch imports as a PromiseStubHook
-            # so the client can pull it later
-            imports[import_id] = PromiseStubHook(result_future)
+                        # Apply transformation to each item
+                        results = []
+                        for item in collection:
+                            result = await applicator.execute(item)
+                            results.append(result)
 
-            # No immediate response - client will pull when ready
-            return None
+                        # Return result as PayloadStubHook
+                        return PayloadStubHook(RpcPayload.owned(results))
+
+                    except RpcError as e:
+                        return ErrorStubHook(e)
+                    except Exception as e:
+                        logger = logging.getLogger(__name__)
+                        logger.exception("Remap execution failed: %s", e)
+                        return ErrorStubHook(RpcError.internal(f"Remap failed: {e}"))
+
+                # Create a future for the result
+                result_future: asyncio.Future[StubHook] = asyncio.create_task(
+                    execute_remap()
+                )
+
+                # Store the future in the batch imports
+                imports[import_id] = PromiseStubHook(result_future)
+
+                # No immediate response - client will pull when ready
+                return None
+
+            # Handle WirePipeline expressions
+            if isinstance(expression, WirePipeline):
+                # Get the target hook (either from batch imports or our exports)
+                target_hook = imports.get(expression.import_id)
+                if target_hook is None:
+                    target_hook = self.get_export_hook(expression.import_id)
+
+                if target_hook is None:
+                    msg = f"Capability {expression.import_id} not found"
+                    raise RpcError.not_found(msg)
+
+                # Parse arguments using the session's parser
+                # This handles any ["export", id] references within the args
+                args_payload = (
+                    self.parser.parse(expression.args)
+                    if expression.args is not None
+                    else RpcPayload.owned([])
+                )
+
+                # Extract the path (method and property names)
+                path: list[str | int] = [
+                    str(pk.value) for pk in (expression.property_path or [])
+                ]
+
+                # Execute the call asynchronously
+                async def execute_call() -> StubHook:
+                    """Execute the method call and return the result hook."""
+                    try:
+                        # target_hook is guaranteed non-None at this point due to check above
+                        assert target_hook is not None
+                        # Call through the hook chain
+                        result_hook = await target_hook.call(path, args_payload)
+                        return result_hook
+
+                    except RpcError as e:
+                        # RPC errors become ErrorStubHook
+                        return ErrorStubHook(e)
+                    except Exception as e:
+                        # Other errors become internal RPC errors
+                        logger = logging.getLogger(__name__)
+                        logger.exception("Call execution failed: %s", e)
+                        return ErrorStubHook(
+                            RpcError.internal(f"Target call failed: {e}")
+                        )
+
+                # Create a future for the result
+                result_future: asyncio.Future[StubHook] = asyncio.create_task(
+                    execute_call()
+                )
+
+                # Store the future in the batch imports as a PromiseStubHook
+                # so the client can pull it later
+                imports[import_id] = PromiseStubHook(result_future)
+
+                # No immediate response - client will pull when ready
+                return None
+
+            msg = "Expected WirePipeline or WireRemap expression in push"
+            raise RpcError.bad_request(msg)
 
         except RpcError as e:
             # If setup fails immediately, we should reject

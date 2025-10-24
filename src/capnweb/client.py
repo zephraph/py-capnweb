@@ -19,6 +19,7 @@ from capnweb.protocol.ids import ExportId
 from capnweb.protocol.wire import (
     PropertyKey,
     WireAbort,
+    WireCapture,
     WireError,
     WireMessage,
     WirePipeline,
@@ -26,6 +27,7 @@ from capnweb.protocol.wire import (
     WirePush,
     WireReject,
     WireRelease,
+    WireRemap,
     WireResolve,
     parse_wire_batch,
     serialize_wire_batch,
@@ -567,6 +569,129 @@ class Client(RpcSession):
         """
         # Similar to send_pipeline_call but with no args
         self.send_pipeline_call(import_id, path, RpcPayload.owned([]), result_import_id)
+
+    def send_pipeline_map(
+        self,
+        import_id: int,
+        path: list[str | int],
+        captures: list,
+        instructions: list[Any],
+        result_import_id: int,
+    ) -> None:
+        """Send a pipelined map message.
+
+        This is called by RpcImportHook/ChainedImportHook when .map() is called
+        on a remote capability.
+
+        Args:
+            import_id: The import ID to map over
+            path: Property path to the iterable
+            captures: External capabilities (StubHooks) used in the map function
+            instructions: Operations to perform for each element
+            result_import_id: Import ID for the result
+        """
+        from capnweb.core.hooks import StubHook
+
+        # Convert captures to wire format
+        wire_captures: list[WireCapture] = []
+        for cap_hook in captures:
+            if not isinstance(cap_hook, StubHook):
+                continue
+
+            # Try to find this hook in our imports
+            cap_import_id = self._get_import_id_for_hook(cap_hook)
+            if cap_import_id is not None:
+                # It's a remote capability we already imported
+                remote_export_id = self._import_to_remote_export.get(
+                    cap_import_id, cap_import_id
+                )
+                wire_captures.append(WireCapture("import", remote_export_id))
+            else:
+                # It's a local capability we need to export
+                cap_export_id = self.export_capability(cap_hook)
+                wire_captures.append(WireCapture("export", cap_export_id))
+
+        # Build property path
+        path_keys = [PropertyKey(p) for p in path] if path else None
+
+        # Look up the remote export_id from our import_id
+        remote_export_id = self._import_to_remote_export.get(import_id, import_id)
+
+        # Create WireRemap expression
+        remap_expr = WireRemap(
+            import_id=remote_export_id,
+            property_path=path_keys,
+            captures=wire_captures,
+            instructions=instructions,
+        )
+
+        # Create push and pull messages
+        push_msg = WirePush(remap_expr)
+        pull_msg = WirePull(result_import_id)
+
+        # Send in a background task
+        async def send_and_handle():
+            if not self._transport:
+                return
+
+            batch = serialize_wire_batch([push_msg, pull_msg])
+            try:
+                response_bytes = await self._transport.send_and_receive(
+                    batch.encode("utf-8")
+                )
+                response_text = response_bytes.decode("utf-8")
+
+                # Parse response and resolve the pending import
+                messages = parse_wire_batch(response_text)
+                for msg in messages:
+                    if (
+                        isinstance(msg, WireResolve)
+                        and msg.export_id == -result_import_id
+                    ):
+                        result_payload = self.parser.parse(msg.value)
+                        # Get the future for this import
+                        if result_import_id in self._pending_promises:
+                            future = self._pending_promises.pop(result_import_id)
+                            if not future.done():
+                                # Create hook from the payload
+                                result_hook = PayloadStubHook(result_payload)
+                                future.set_result(result_hook)
+                    elif (
+                        isinstance(msg, WireReject)
+                        and msg.export_id == -result_import_id
+                    ):
+                        error = self._parse_error(msg.error)
+                        if result_import_id in self._pending_promises:
+                            future = self._pending_promises.pop(result_import_id)
+                            if not future.done():
+                                error_hook = ErrorStubHook(error)
+                                future.set_result(error_hook)
+            except Exception as e:
+                # Handle transport errors
+                if result_import_id in self._pending_promises:
+                    future = self._pending_promises.pop(result_import_id)
+                    if not future.done():
+                        error = RpcError.internal(f"Transport error: {e}")
+                        error_hook = ErrorStubHook(error)
+                        future.set_result(error_hook)
+
+        # Schedule the task
+        asyncio.create_task(send_and_handle())
+
+    def _get_import_id_for_hook(self, hook: StubHook) -> int | None:
+        """Look up the import ID for a hook in our imports table.
+
+        Args:
+            hook: The StubHook to look up
+
+        Returns:
+            The import ID if found, None otherwise
+        """
+
+        for import_id, stored_hook in self._imports.items():
+            if stored_hook is hook:
+                return import_id
+        return None
 
     async def pull_import(self, import_id: int) -> RpcPayload:
         """Pull the value from a remote capability.
