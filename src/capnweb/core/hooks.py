@@ -64,19 +64,19 @@ class StubHook(ABC):
         """
         ...
 
-    @abstractmethod
-    def map(self, path: list[str | int], captures: list[StubHook], instructions: list[Any]) -> StubHook:
-        """Apply a map operation through this hook.
-
-        Args:
-            path: Property path to the iterable to map over
-            captures: External capabilities used in the map function
-            instructions: A list of operations to perform for each element
-
-        Returns:
-            A new StubHook representing the promise for the mapped result
-        """
-        ...
+    # @abstractmethod
+    # def map(self, path: list[str | int], captures: list[StubHook], instructions: list[Any]) -> StubHook:
+    #     """Apply a map operation through this hook.
+    #
+    #     Args:
+    #         path: Property path to the iterable to map over
+    #         captures: External capabilities used in the map function
+    #         instructions: A list of operations to perform for each element
+    #
+    #     Returns:
+    #         A new StubHook representing the promise for the mapped result
+    #     """
+    #     ...
 
     @abstractmethod
     async def pull(self) -> RpcPayload:
@@ -132,7 +132,9 @@ class ErrorStubHook(StubHook):
         """Always returns self (errors propagate through chains)."""
         return self
 
-    def map(self, path: list[str | int], captures: list[StubHook], instructions: list[Any]) -> StubHook:
+    def map(
+        self, path: list[str | int], captures: list[StubHook], instructions: list[Any]
+    ) -> StubHook:
         """Dispose captures and return self (errors propagate)."""
         # Dispose captures as we are taking ownership.
         for cap in captures:
