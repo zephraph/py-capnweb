@@ -1,25 +1,23 @@
 import asyncio
-from typing import Any
 
-from capnweb.error import RpcError
 from capnweb.server import Server, ServerConfig
 from capnweb.types import RpcTarget
 
 
 class Calculator(RpcTarget):
-    async def call(self, method: str, args: list[Any]) -> Any:
-        match method:
-            case "add":
-                return args[0] + args[1]
-            case "subtract":
-                return args[0] - args[1]
-            case _:
-                msg = f"Method {method} not found"
-                raise RpcError.not_found(msg)
+    """Calculator service using automatic method dispatch.
 
-    async def get_property(self, property: str) -> Any:
-        msg = "Property access not implemented"
-        raise RpcError.not_found(msg)
+    Methods are automatically exposed as RPC endpoints.
+    No need for manual call() implementation with match/case.
+    """
+
+    async def add(self, a: int, b: int) -> int:
+        """Add two numbers."""
+        return a + b
+
+    async def subtract(self, a: int, b: int) -> int:
+        """Subtract b from a."""
+        return a - b
 
 
 async def main() -> None:
